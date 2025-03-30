@@ -1,121 +1,109 @@
-CC = i686-elf-gcc
-LD = i686-elf-ld -m elf_i386
-CFLAGS = -ffreestanding -g -Wall -Wextra -m32 -Iinclude -Ilimine
-LDFLAGS = -nostdlib
-BUILD_DIR = build
-BIN_DIR = bin
-SYSROOT_DIR = sysroot
-KERNEL_BIN = $(BIN_DIR)/myos
+# Nuke built-in rules and variables.
+MAKEFLAGS += -rR
+.SUFFIXES:
 
-# Source files for the kernel
-SRC =  src/drivers/keyboard.c \
-       src/drivers/serial.c \
-       src/stdio/puts.c \
-       src/stdio/tty.c \
-       src/stdio/putchar.c \
-       src/stdio/printf.c \
-			 src/kernel.c \
-			 src/main.c \
-       src/stdlib/abort.c \
-       src/string/memcmp.c \
-       src/string/memcpy.c \
-       src/string/memmove.c \
-       src/string/memset.c \
-       src/string/memstr.c \
-       src/string/strncpy.c \
-       src/string/strlen.c \
-       src/fs/vfs.c \
-       src/mem/free.c \
-       src/mem/malloc.c \
-       src/mem/realloc.c \
-       src/mem/paging.c \
-       src/mem/calloc.c \
-       src/processor/spinlock.c \
-       src/processor/kprint.c \
-       src/cpu/gdt.c \
-       src/cpu/util.c \
-       src/cpu/syscall.c \
-       src/cpu/idt.c
+# This is the name that our final executable will have.
+# Change as needed.
+override OUTPUT := myos
 
-# Assembly source files
-ASM_SRC = src/asm/idt.asm src/asm/gdt.asm
+# Convenience macro to reliably declare user overridable variables.
+override USER_VARIABLE = $(if $(filter $(origin $(1)),default undefined),$(eval override $(1) := $(2)))
 
-# Object files for the kernel
-OBJ = $(SRC:src/%.c=$(BUILD_DIR)/%.o) $(ASM_SRC:src/%.asm=$(BUILD_DIR)/%.o)
+# User controllable C compiler command.
+$(call USER_VARIABLE,KCC,cc)
 
-# Source files for libk (kernel library)
-LIBK_SRC = $(SRC)  # You can add more files specific to libk if needed
-LIBK_OBJ = $(LIBK_SRC:src/%.c=$(BUILD_DIR)/%.libk.o)
+# User controllable linker command.
+$(call USER_VARIABLE,KLD,ld)
 
-# Output library file
-LIBK = $(BIN_DIR)/libk.a
+# User controllable C flags.
+$(call USER_VARIABLE,KCFLAGS,-g -O2 -pipe)
 
-all: clean libk kernel image install_limine
+# User controllable C preprocessor flags. We set none by default.
+$(call USER_VARIABLE,KCPPFLAGS,)
 
+# User controllable nasm flags.
+$(call USER_VARIABLE,KNASMFLAGS,-F dwarf -g)
+
+# User controllable linker flags. We set none by default.
+$(call USER_VARIABLE,KLDFLAGS,)
+
+# Internal C flags that should not be changed by the user.
+override KCFLAGS += \
+    -Wall \
+    -Wextra \
+ 		-O0 \
+    -std=gnu11 \
+    -ffreestanding \
+    -fno-stack-protector \
+    -fno-stack-check \
+    -fPIE \
+		-mcmodel=large \
+    -m64 \
+    -march=x86-64 \
+    -mno-80387 \
+    -mno-mmx \
+	-g \
+    -mno-sse \
+    -mno-sse2 \
+	-fno-omit-frame-pointer \
+    -mno-red-zone
+
+# Internal C preprocessor flags that should not be changed by the user.
+override KCPPFLAGS := \
+    -I src \
+    $(KCPPFLAGS) \
+    -MMD \
+    -MP
+
+# Internal nasm flags that should not be changed by the user.
+override KNASMFLAGS += \
+    -Wall \
+    -f elf64
+
+# Internal linker flags that should not be changed by the user.
+override KLDFLAGS += \
+    -m elf_x86_64 \
+    -nostdlib \
+    -static \
+    -z max-page-size=0x1000 \
+    -T linker.ld
+
+# Use "find" to glob all *.c, *.S, and *.asm files in the tree and obtain the
+# object and header dependency file names.
+override CFILES := $(shell cd src && find -L * -type f -name '*.c' | LC_ALL=C sort)
+override ASFILES := $(shell cd src && find -L * -type f -name '*.S' | LC_ALL=C sort)
+override NASMFILES := $(shell cd src && find -L * -type f -name '*.asm' | LC_ALL=C sort)
+override OBJ := $(addprefix obj/,$(CFILES:.c=.c.o) $(ASFILES:.S=.S.o) $(NASMFILES:.asm=.asm.o))
+override HEADER_DEPS := $(addprefix obj/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
+
+# Default target.
+.PHONY: all
+all: bin/$(OUTPUT)
+
+# Link rules for the final executable.
+bin/$(OUTPUT): linker.ld $(OBJ)
+	mkdir -p "$$(dirname $@)"
+	$(KLD) $(OBJ) $(KLDFLAGS) -o $@
+
+# Include header dependencies.
+-include $(HEADER_DEPS)
+
+# Compilation rules for *.c files.
+obj/%.c.o: src/%.c
+	mkdir -p "$$(dirname $@)"
+	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -c $< -o $@
+
+# Compilation rules for *.S files.
+obj/%.S.o: src/%.S 
+	mkdir -p "$$(dirname $@)"
+	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -c $< -o $@
+
+# Compilation rules for *.asm (nasm) files.
+obj/%.asm.o: src/%.asm
+	mkdir -p "$$(dirname $@)"
+	nasm $(KNASMFLAGS) $< -o $@
+
+# Remove object files and the final executable.
+.PHONY: clean
 clean:
-	rm -rf $(BUILD_DIR) $(BIN_DIR) image.iso iso_root
-	rm -f $(OBJ) $(LIBK_OBJ) *.o */*.o */*/*.o
-	rm -f $(OBJ:.o=.d) $(LIBK_OBJ:.o=.d) *.d */*.d */*/*.d
-
-install-headers:
-	mkdir -p $(SYSROOT_DIR)/usr/include
-	cp -R --preserve=timestamps include/. $(SYSROOT_DIR)/usr/include/.
-
-install-libs: $(LIBK)
-	mkdir -p $(SYSROOT_DIR)/usr/lib
-	cp $(LIBK) $(SYSROOT_DIR)/usr/lib/.
-
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
-
-$(BIN_DIR):
-	mkdir -p $(BIN_DIR)
-
-# Build libk.a
-libk: $(LIBK)
-
-$(LIBK): $(LIBK_OBJ)
-	$(AR) rcs $@ $(LIBK_OBJ)
-
-# Rule to compile libk object files
-$(BUILD_DIR)/%.libk.o: src/%.c | $(BUILD_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -D__is_libk -c $< -o $@
-
-# Rule to compile .asm files into .o files
-$(BUILD_DIR)/%.o: src/%.asm | $(BUILD_DIR)
-	mkdir -p $(dir $@)
-	nasm -f elf32 $< -o $@
-
-# Build the kernel
-kernel: $(BUILD_DIR) $(BIN_DIR) $(OBJ) $(LIBK)
-	$(LD) $(LDFLAGS) -T linker.ld -o $(KERNEL_BIN) $(OBJ) -L$(BIN_DIR) -lk
-
-# Rule to compile kernel object files
-$(BUILD_DIR)/%.o: src/%.c | $(BUILD_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
-
-# Create the bootable ISO image
-image: kernel
-	mkdir -p iso_root/boot
-	cp -v $(KERNEL_BIN) iso_root/boot/
-	mkdir -p iso_root/boot/limine
-	cp -v limine/limine-bios.sys limine/limine-bios-cd.bin \
-	      limine/limine-uefi-cd.bin limine.conf iso_root/boot/limine/
-
-	mkdir -p iso_root/EFI/BOOT
-	cp -v limine/BOOTX64.EFI iso_root/EFI/BOOT/
-	cp -v limine/BOOTIA32.EFI iso_root/EFI/BOOT/
-
-	xorriso -as mkisofs -R -r -J -b boot/limine/limine-bios-cd.bin \
-		-no-emul-boot -boot-load-size 4 -boot-info-table -hfsplus \
-		-apm-block-size 2048 --efi-boot boot/limine/limine-uefi-cd.bin \
-		-efi-boot-part --efi-boot-image --protective-msdos-label \
-		iso_root -o image.iso
-
-# Install Limine bootloader
-install_limine: image
-	./limine/limine bios-install image.iso
-
-.PHONY: all clean install-headers install-libs libk kernel image install_limine
+	rm -rf obj
