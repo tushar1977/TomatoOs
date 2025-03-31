@@ -5,12 +5,14 @@
 #include "stdint.h"
 #include "util.h"
 
-struct InterruptDescriptor32 {
-  uint16_t offset_1; // offset bits 0..15
-  uint16_t selector; // a code segment selector in GDT or LDT
-  uint8_t zero;      // unused, set to 0
-  uint8_t flags;     // gate type, dpl, and p fields
-  uint16_t offset_2; // offset bits 16..31
+struct InterruptDescriptor64 {
+  uint16_t address_low;
+  uint16_t selector;
+  uint8_t ist;
+  uint8_t flags;
+  uint16_t address_mid;
+  uint32_t address_high;
+  uint32_t reserved;
 } __attribute__((packed));
 
 struct Idt_ptr {
@@ -19,7 +21,7 @@ struct Idt_ptr {
 } __attribute__((packed));
 
 void InitIdt();
-void setIdtGate(uint8_t num, uint32_t base, uint16_t sel, uint8_t flags);
+void setIdtGate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags);
 void isr_handle(struct InterruptRegisters *regs);
 
 void irq_install_handler(int irq,
