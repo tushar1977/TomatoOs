@@ -1,11 +1,13 @@
 #include "../include/pmm.h"
+#include "../include/fb.h"
+#include "../include/flanterm.h"
 #include "../include/kernel.h"
 #include "../include/limine.h"
 #include "../include/string.h"
 physical_allocator physical;
 void init_PMM() {
-  struct limine_memmap_entry *largest = NULL;
 
+  struct limine_memmap_entry *largest = NULL;
   for (size_t i = 0; i < kernel.memmap.entry_count; i++) {
     struct limine_memmap_entry *entry = kernel.memmap.entries[i];
     if (entry->type == LIMINE_MEMMAP_USABLE) {
@@ -18,7 +20,6 @@ void init_PMM() {
   physical.base = largest->base;
   physical.size = largest->length;
 }
-
 static void *b_malloc(uint64_t *base, size_t length, size_t size) {
   if (length <= BLOCK_SIZE) {
     if (size + 1 <= length && *((uint64_t *)base) == 0) {

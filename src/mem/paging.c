@@ -22,16 +22,21 @@ uint64_t readCR3(void) {
   return val;
 }
 
-void map_kernel() {
+void map_sections() {
+  uint64_t v_add = physical.base;
+  size_t pages = (physical.size) / 4096;
 
+  map_page(physical.base + kernel.hhdm, physical.base,
+           KERNEL_PFLAG_PRESENT | KERNEL_PFLAG_WRITE, pages);
+}
+void map_kernel() {
   uint64_t p_kernel = kernel.kernel_addr.physical_base;
   uint64_t v_kernel = kernel.kernel_addr.virtual_base;
 
-  uint64_t offset = v_kernel - p_kernel;
-
-  uint64_t phys_kernel_start = (uint64_t)p_kernel_start - offset;
-  uint64_t phys_writeallowed_start = (uint64_t)p_writeallowed_start - offset;
-  uint64_t phys_kernel_end = (uint64_t)p_kernel_end - offset;
+  uint64_t phys_kernel_start = (uint64_t)p_kernel_start - (v_kernel - p_kernel);
+  uint64_t phys_writeallowed_start =
+      (uint64_t)p_writeallowed_start - (v_kernel - p_kernel);
+  uint64_t phys_kernel_end = (uint64_t)p_kernel_end - (v_kernel - p_kernel);
 
   uint64_t readonly_size =
       (uint64_t)p_writeallowed_start - (uint64_t)p_kernel_start;
@@ -40,46 +45,17 @@ void map_kernel() {
 
   size_t readonly_pages = (readonly_size + 4095) / 4096;
   size_t writable_pages = (writable_size + 4095) / 4096;
-  map_page((uint64_t)p_kernel_start, phys_kernel_start, KERNEL_PFLAG_PRESENT,
-           readonly_pages);
 
-  map_page((uint64_t)p_writeallowed_start, phys_writeallowed_start,
+  map_page(phys_kernel_start + kernel.hhdm, phys_kernel_start,
+           KERNEL_PFLAG_PRESENT, readonly_pages);
+
+  map_page(phys_writeallowed_start + kernel.hhdm, phys_writeallowed_start,
            KERNEL_PFLAG_PRESENT | KERNEL_PFLAG_WRITE, writable_pages);
-}
-
-void map_sections() {
-  uint64_t num_memmap = kernel.memmap.entry_count;
-  struct limine_memmap_entry **memmap_entries = kernel.memmap.entries;
-
-  for (size_t i = 0; i < num_memmap; i++) {
-    struct limine_memmap_entry *entry = memmap_entries[i];
-    uint64_t entry_type = entry->type;
-
-    if (entry_type == LIMINE_MEMMAP_USABLE ||
-        entry_type == LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE ||
-        entry_type == LIMINE_MEMMAP_FRAMEBUFFER ||
-        entry_type == LIMINE_MEMMAP_KERNEL_AND_MODULES ||
-        entry_type == LIMINE_MEMMAP_ACPI_NVS ||
-        entry_type == LIMINE_MEMMAP_ACPI_RECLAIMABLE) {
-
-      uint64_t page_count = (entry->length + 4095) / 4096;
-
-      if (page_count == 0)
-        continue;
-
-      uint64_t phys_addr = entry->base & ~0xFFFULL; // Align to page boundary
-      uint64_t virt_addr = phys_addr + kernel.hhdm;
-
-      map_page(virt_addr, phys_addr, KERNEL_PFLAG_PRESENT | KERNEL_PFLAG_WRITE,
-               page_count);
-    }
-  }
 }
 PageTable *initPML4() {
   uintptr_t cr3 = (uintptr_t)readCR3();
   PML4 = (PageTable *)((cr3 >> 12) << 12);
   map_kernel();
-
   kernel.cr3 = (uint64_t)(PML4 + kernel.hhdm) - kernel.hhdm;
   return PML4;
 }
