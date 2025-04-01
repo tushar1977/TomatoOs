@@ -1,6 +1,7 @@
 #include "../include/idt.h"
 #include "../include/fb.h"
 #include "../include/kernel.h"
+#include "../include/paging.h"
 #include "../include/pmm.h"
 #include "../include/stdio.h"
 #include "../include/string.h"
@@ -9,7 +10,8 @@
 #include "stdint.h"
 
 void InitIdt() {
-
+  uint64_t virt =
+      (uint64_t)k_malloc(256 * sizeof(struct InterruptDescriptor64));
   struct InterruptDescriptor64 *IDT =
       (struct InterruptDescriptor64
            *)((uint64_t)k_malloc(256 * sizeof(struct InterruptDescriptor64)) +
@@ -52,6 +54,7 @@ void InitIdt() {
 
   kernel.idtr.base = (uint64_t)IDT;
   kernel.idtr.limit = (sizeof(struct InterruptDescriptor64) * 256) - 1;
+
   asm volatile("lidt %0" ::"m"(kernel.idtr));
 }
 void setIdtGate(struct InterruptDescriptor64 *idt_entries, uint8_t num,
