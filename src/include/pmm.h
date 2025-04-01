@@ -6,6 +6,7 @@ typedef struct {
   uint64_t size;
 } physical_allocator;
 
+extern physical_allocator physical;
 void init_PMM();
 
 void *k_malloc(size_t size);

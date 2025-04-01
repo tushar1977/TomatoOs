@@ -39,3 +39,5 @@ PageTable *initPML4();
 void map_page(uint64_t virt, uint64_t phys, uint64_t flags, size_t size);
 uint64_t readCR3(void);
 void *getPhysicalAddress(void *virtual_address);
+
+void map_sections();

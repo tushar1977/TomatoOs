@@ -2,6 +2,9 @@
 #ifndef KERNEL_H
 #define KERNEL_H
 
+#include "acpi.h"
+#include "fb.h"
+#include "flanterm.h"
 #include "gdt.h"
 #include "idt.h"
 #include "limine.h"
@@ -11,6 +14,9 @@ typedef struct {
   struct limine_memmap_response memmap;
   struct limine_kernel_address_response kernel_addr;
   struct limine_kernel_file_response kernel_file;
+  RSDP *rsdp_table;
+  RSDT *rsdt;
+  struct flanterm_context *ft_ctx;
   struct gdt_ptr_struct gdtr;
   struct Idt_ptr idtr;
   uint64_t hhdm;
