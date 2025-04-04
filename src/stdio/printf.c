@@ -2,81 +2,92 @@
 #include "../include/flanterm.h"
 #include "../include/kernel.h"
 #include "../include/string.h"
+#include "limits.h"
 #include <stdarg.h>
-
-void kprintf(const char *fmt, ...) {
-
-  va_list args;
-  va_start(args, fmt);
-
+Spinlock lock;
+int kprintf(const char *restrict format, ...) {
+  va_list parameters;
+  va_start(parameters, format);
   char buf[32];
+  int written = 0;
 
-  while (*fmt) {
-    if (strcmp(fmt, "%") == 0) {
+  while (*format != '\0') {
+    if (format[0] == '\033' && format[1] == '[') {
+      const char *seq_start = format;
+      format += 2;
 
-      if (strcmp(fmt, "\\") == 0) {
-        fmt++;
+      size_t seq_len = 0;
+      while (format[seq_len] && format[seq_len] != 'm')
+        seq_len++;
+      if (format[seq_len] == 'm') {
+        size_t total_len = seq_len + 3;
+        flanterm_write(kernel.ft_ctx, seq_start, total_len);
+        format += seq_len + 1;
+        written += total_len;
+      } else {
+        flanterm_write(kernel.ft_ctx, seq_start, 2);
+        format += 2;
+        written += 2;
+      }
+      continue;
+    }
+    size_t maxrem = INT_MAX - written;
 
-        switch (*fmt) {
-        case 'n':
-          flanterm_write(kernel.ft_ctx, "\n", 1);
-          break;
-        case 't':
-          flanterm_write(kernel.ft_ctx, "\t", 1);
-          break;
-        case 'r':
-          flanterm_write(kernel.ft_ctx, "\r", 1);
-          break;
-        case 'b':
-          flanterm_write(kernel.ft_ctx, "\b", 1);
-          break;
-        case 'f':
-          flanterm_write(kernel.ft_ctx, "\f", 1);
-          break;
-        case '\\':
-          flanterm_write(kernel.ft_ctx, "\\", 1);
-          break;
-        case '\'':
-          flanterm_write(kernel.ft_ctx, "'", 1);
-          break;
-        case '"':
-          flanterm_write(kernel.ft_ctx, "\"", 1);
-          break;
-        case '0':
-          flanterm_write(kernel.ft_ctx, "\0", 1);
-          break;
-        default:
-          flanterm_write(kernel.ft_ctx, "\\", 1);
-          flanterm_write(kernel.ft_ctx, fmt, 1);
-          break;
-        }
-
-        fmt++;
-        continue;
+    if (format[0] != '%' || format[1] == '%') {
+      if (format[0] == '%')
+        format++;
+      size_t amount = 1;
+      while (format[amount] && format[amount] != '%')
+        amount++;
+      if (maxrem < amount) {
+        return -1;
       }
 
-      flanterm_write(kernel.ft_ctx, fmt, 1);
-      fmt++;
+      flanterm_write(kernel.ft_ctx, format, amount);
+      format += amount;
+      written += amount;
       continue;
     }
 
-    fmt++;
-    switch (*fmt) {
+    const char *format_begun_at = format++;
+
+    switch (*format) {
+    case 'c': {
+      format++;
+      char c = (char)va_arg(parameters, int);
+      flanterm_write(kernel.ft_ctx, &c, 1);
+      written += 1;
+      break;
+    }
+
+    case 's': {
+      format++;
+      const char *str = va_arg(parameters, const char *);
+      size_t len = strlen(str);
+      flanterm_write(kernel.ft_ctx, str, len);
+      written += len;
+      break;
+    }
+
     case 'd': {
-      int num = va_arg(args, int);
+      format++;
+      int num = va_arg(parameters, int);
       int i = 0;
       if (num < 0) {
         buf[i++] = '-';
         num = -num;
+      } else if (num == 0) {
+        buf[i++] = '0';
       }
+
       int digits = 0;
       int tmp = num;
-      do {
+      while (tmp > 0) {
         buf[i++] = '0' + (tmp % 10);
         tmp /= 10;
         digits++;
-      } while (tmp > 0);
-      // Reverse the digits
+      }
+
       int start = (buf[0] == '-') ? 1 : 0;
       int end = i - 1;
       while (start < end) {
@@ -86,68 +97,60 @@ void kprintf(const char *fmt, ...) {
         start++;
         end--;
       }
+
       flanterm_write(kernel.ft_ctx, buf, i);
+      written += i;
       break;
     }
 
-    case 'x': { // Hexadecimal
-      unsigned int num = va_arg(args, unsigned int);
+    case 'x': {
+      format++;
+      unsigned int num = va_arg(parameters, unsigned int);
       buf[0] = '0';
       buf[1] = 'x';
+
       if (num == 0) {
         buf[2] = '0';
         flanterm_write(kernel.ft_ctx, buf, 3);
+        written += 3;
       } else {
         int i = 2;
+        bool started = false;
+
         for (int shift = 28; shift >= 0; shift -= 4) {
           int nibble = (num >> shift) & 0xF;
-          if (nibble != 0 || i > 2) {
+          if (nibble != 0 || started) {
             buf[i++] = nibble < 10 ? '0' + nibble : 'a' + nibble - 10;
+            started = true;
           }
         }
+
         flanterm_write(kernel.ft_ctx, buf, i);
+        written += i;
       }
       break;
     }
 
-    case 'c': { // Character
-      char c = (char)va_arg(args, int);
-      flanterm_write(kernel.ft_ctx, &c, 1);
+    default: {
+      flanterm_write(kernel.ft_ctx, format_begun_at, 1);
+      format++;
+      written++;
       break;
     }
-
-    case 's': { // String
-      const char *str = va_arg(args, const char *);
-      size_t len = 0;
-      while (str[len])
-        len++;
-      flanterm_write(kernel.ft_ctx, str, len);
-      break;
     }
-
-    case 'p': { // Pointer
-      void *ptr = va_arg(args, void *);
-      uintptr_t num = (uintptr_t)ptr;
-      buf[0] = '0';
-      buf[1] = 'x';
-      int i = 2;
-      for (int shift = (sizeof(uintptr_t) * 8) - 4; shift >= 0; shift -= 4) {
-        int nibble = (num >> shift) & 0xF;
-        if (nibble != 0 || i > 2) {
-          buf[i++] = nibble < 10 ? '0' + nibble : 'a' + nibble - 10;
-        }
-      }
-      flanterm_write(kernel.ft_ctx, buf, i);
-      break;
-    }
-
-    default:
-      flanterm_write(kernel.ft_ctx, fmt, 1);
-      break;
-    }
-
-    fmt++;
   }
 
-  va_end(args);
+  va_end(parameters);
+  return written;
+}
+
+void k_ok() { kprintf(" \033[1;32mOK!\033[0m\n"); }
+
+void k_fail() { kprintf(" \033[1;31mFAIL!\033[0m\n"); }
+
+void k_debug(const char *msg) {
+  spinlock_aquire(&lock);
+  kprintf("\033[1;35mDEBUG!\033[0m %s", msg);
+  k_ok();
+  spinlock_release(&lock);
 }
