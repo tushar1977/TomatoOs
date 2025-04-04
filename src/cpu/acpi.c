@@ -2,6 +2,7 @@
 #include "../include/flanterm.h"
 #include "../include/kernel.h"
 #include "../include/paging.h"
+#include "../include/printf.h"
 #include "../include/string.h"
 void init_acpi() {
   if (kernel.rsdp_table->revision != 0) {
@@ -14,6 +15,8 @@ void init_acpi() {
   RSDT *rsdt = (RSDT *)(kernel.rsdp_table->rsdt_address + kernel.hhdm);
   uint64_t rsdt_num_entries = (rsdt->header.length - sizeof(rsdt->header)) / 4;
   kernel.rsdt = rsdt;
+
+  k_debug("Initialising ACPI...");
 }
 
 void *find_MADT(RSDT *root_rsdt) {

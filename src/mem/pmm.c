@@ -3,10 +3,11 @@
 #include "../include/flanterm.h"
 #include "../include/kernel.h"
 #include "../include/limine.h"
+#include "../include/printf.h"
 #include "../include/string.h"
 physical_allocator physical;
 void init_PMM() {
-
+  k_debug("Initialising Physical Memory Allocator...");
   struct limine_memmap_entry *largest = NULL;
   for (size_t i = 0; i < kernel.memmap.entry_count; i++) {
     struct limine_memmap_entry *entry = kernel.memmap.entries[i];
@@ -19,6 +20,53 @@ void init_PMM() {
 
   physical.base = largest->base;
   physical.size = largest->length;
+}
+
+void printMemoryMaps() {
+  kprintf("Memory Map:\n");
+  kprintf("--------------------------------------------------\n");
+
+  for (size_t i = 0; i < kernel.memmap.entry_count; i++) {
+    struct limine_memmap_entry *entry = kernel.memmap.entries[i];
+
+    const char *type_str;
+    switch (entry->type) {
+    case 1:
+      type_str = "Available";
+      break;
+    case 2:
+      type_str = "Reserved";
+      break;
+    case 3:
+      type_str = "ACPI Recl";
+      break;
+    case 4:
+      type_str = "ACPI NVS";
+      break;
+    case 5:
+      type_str = "Bad Mem";
+      break;
+    default:
+      type_str = "Unknown";
+      break;
+    }
+
+    kprintf("| %x | 0x%x | %dMB | %s |\n", i, (unsigned int)(entry->base),
+            (int)(entry->length / (1024 * 1024)), type_str);
+  }
+
+  kprintf("--------------------------------------------------\n");
+  kprintf("Total entries: %d\n", kernel.memmap.entry_count);
+
+  uint64_t total_available = 0;
+  for (size_t i = 0; i < kernel.memmap.entry_count; i++) {
+    if (kernel.memmap.entries[i]->type == 1) {
+      total_available += kernel.memmap.entries[i]->length;
+    }
+  }
+
+  kprintf("Total available memory: %d MB (%d KB)\n",
+          total_available / (1024 * 1024), total_available / 1024);
 }
 static void *b_malloc(uint64_t *base, size_t length, size_t size) {
   if (length <= BLOCK_SIZE) {

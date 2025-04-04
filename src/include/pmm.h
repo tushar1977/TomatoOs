@@ -9,5 +9,6 @@ typedef struct {
 extern physical_allocator physical;
 void init_PMM();
 
+void printMemoryMaps();
 void *k_malloc(size_t size);
 void k_free(void *base);

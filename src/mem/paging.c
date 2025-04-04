@@ -2,6 +2,7 @@
 #include "../include/kernel.h"
 #include "../include/limine.h"
 #include "../include/pmm.h"
+#include "../include/printf.h"
 #include "../include/stddef.h"
 #include "../include/string.h"
 #include <stdint.h>
@@ -53,6 +54,8 @@ void map_kernel() {
            KERNEL_PFLAG_PRESENT | KERNEL_PFLAG_WRITE, writable_pages);
 }
 PageTable *initPML4() {
+
+  k_debug("Initialising Page Tables...");
   uintptr_t cr3 = (uintptr_t)readCR3();
   PML4 = (PageTable *)((cr3 >> 12) << 12);
   map_kernel();

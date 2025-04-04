@@ -1,5 +1,6 @@
 #include "../include/gdt.h"
 #include "../include/kernel.h"
+#include "../include/printf.h"
 #include "../include/string.h"
 #include <stdint.h>
 
@@ -12,7 +13,6 @@ struct gdt_ptr_struct gdt_ptr;
 struct tss_entry_struct tss;
 
 void initGdt() {
-
   setGdtGate(0, 0, 0, 0, 0);            // Null segment
   setGdtGate(1, 0, 0xFFFFF, 0x9A, 0xA); // Kernel code segment
   setGdtGate(2, 0, 0xFFFFF, 0x92, 0xC); // Kernel data segment
@@ -25,6 +25,7 @@ void initGdt() {
 
   gdt_flush((uint64_t)&kernel.gdtr);
   tss_flush();
+  k_debug("Initialising GDT...");
 }
 
 void write_tss(int num, uint64_t base, uint64_t limit, uint8_t access,

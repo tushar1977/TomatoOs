@@ -1,10 +1,10 @@
 #include "../include/keyboard.h"
+#include "../include/fb.h"
 #include "../include/idt.h"
+#include "../include/kernel.h"
 #include "../include/memory.h"
 #include "../include/stdio.h"
 #include "../include/string.h"
-#include "../include/tty.h"
-#include "../include/vga.h"
 #include "stdint.h"
 #include <stdbool.h>
 
@@ -95,96 +95,13 @@ const uint32_t uppercase[128] = {
 
 void clear() {
   uint8_t p = 0;
-  // Loop through the text buffer and set each character to '\0' (null
-  // terminator)
   while (text[p] != '\0') {
     text[p] = '\0';
     p++;
   }
 }
 
-void keyboardHandler(struct InterruptRegisters *regs) {
-  char scanCode = inPortB(0x60) & 0x7F;
-  char press = inPortB(0x60) & 0x80;
-  // printf("%d", scanCode);
-
-  switch (scanCode) {
-  case 1:
-  case 29:
-  case 56:
-  case 59:
-  case 60:
-  case 61:
-  case 62:
-  case 63:
-  case 64:
-  case 65:
-  case 66:
-  case 67:
-  case 68:
-  case 87:
-  case 88:
-    break;
-  case 42:
-    if (press == 0) {
-      capsOn = true;
-    } else {
-      capsOn = false;
-    }
-    break;
-  case 28:
-    if (press == 0) {
-      newline();
-
-      if (strcmp("clear", text) == 0) {
-        Reset();
-      }
-
-      else if (scanCode != 28) {
-        printf("Unknown command: %s\n", text);
-      }
-
-      clear();
-
-      printf("tusos--> ");
-    }
-    break;
-  case 58:
-    if (!capsLock && press == 0) {
-      capsLock = true;
-    } else if (capsLock && press == 0) {
-      capsLock = false;
-    }
-    break;
-  default:
-    if (press == 0) {
-      if (scanCode >= 0 && scanCode < 128) {
-        if (capsOn) {
-          printf("%c", uppercase[scanCode]);
-        } else if (capsLock) {
-          printf("%c", (scanCode >= 'a' && scanCode <= 'z')
-                           ? uppercase[scanCode]
-                           : lowercase[scanCode]);
-        } else {
-          printf("%c", lowercase[scanCode]);
-        }
-
-        int i = 0;
-        while (text[i] != '\0' && i < sizeof(text) - 1) {
-          i++;
-        }
-        if (i < sizeof(text) - 1) {
-          text[i] =
-              (capsOn || capsLock) ? uppercase[scanCode] : lowercase[scanCode];
-          text[i + 1] = '\0';
-        }
-      }
-    }
-  }
-}
-
 void initKeyboard() {
   capsOn = false;
   capsLock = false;
-  irq_install_handler(1, &keyboardHandler);
 }

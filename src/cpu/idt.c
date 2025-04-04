@@ -3,34 +3,17 @@
 #include "../include/kernel.h"
 #include "../include/paging.h"
 #include "../include/pmm.h"
+#include "../include/printf.h"
 #include "../include/stdio.h"
 #include "../include/string.h"
-#include "../include/tty.h"
 #include "../include/util.h"
 #include "stdint.h"
 
 void InitIdt() {
-  uint64_t virt =
-      (uint64_t)k_malloc(256 * sizeof(struct InterruptDescriptor64));
   struct InterruptDescriptor64 *IDT =
       (struct InterruptDescriptor64
            *)((uint64_t)k_malloc(256 * sizeof(struct InterruptDescriptor64)) +
-              ((uint64_t)kernel.hhdm));
-
-  outPortB(0x20, 0x11);
-  outPortB(0xA0, 0x11);
-
-  outPortB(0x21, 0x20);
-  outPortB(0xA1, 0x28);
-
-  outPortB(0x21, 0x04);
-  outPortB(0xA1, 0x02);
-
-  outPortB(0x21, 0x01);
-  outPortB(0xA1, 0x01);
-
-  outPortB(0x21, 0x0);
-  outPortB(0xA1, 0x0);
+              kernel.hhdm);
 
   setIdtGate(IDT, 0, &divideException, 0x08, 0x8E);
   setIdtGate(IDT, 1, &debugException, 0x08, 0x8E);
@@ -56,6 +39,8 @@ void InitIdt() {
   kernel.idtr.limit = (sizeof(struct InterruptDescriptor64) * 256) - 1;
 
   asm volatile("lidt %0" ::"m"(kernel.idtr));
+
+  k_debug("Initialising IDT...");
 }
 void setIdtGate(struct InterruptDescriptor64 *idt_entries, uint8_t num,
                 void *base, uint16_t sel, uint8_t flags) {

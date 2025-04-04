@@ -11,7 +11,6 @@ VFS *init_vfs() {
 
   vfs->superblock = (Superblock *)malloc(sizeof(Superblock));
   if (vfs->superblock == NULL) {
-    printf("Error: Failed to allocate superblock\n");
     free(vfs);
     return NULL;
   }

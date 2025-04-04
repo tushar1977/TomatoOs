@@ -1,15 +1,17 @@
 #include "include/acpi.h"
+#include "include/apic.h"
 #include "include/bootinfo.h"
 #include "include/flanterm.h"
 #include "include/gdt.h"
 #include "include/idt.h"
 #include "include/kernel.h"
-#include "include/keyboard.h"
 #include "include/limine.h"
 #include "include/paging.h"
 #include "include/pmm.h"
-#include "include/stdio.h"
+#include "include/printf.h"
 #include "include/string.h"
+#include "include/util.h"
+#include "limits.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -58,14 +60,32 @@ void init_kernel() {
       1, 0, 0, 0);
 }
 
+void delay(int ticks) {
+  for (volatile int i = 0; i < ticks * 1000000; i++) {
+    __asm__ __volatile__("nop");
+  }
+}
 void kmain(void) {
   init_kernel();
+
   clear_framebuffer();
+
+  delay(1);
   init_PMM();
+
+  delay(1);
   initPML4();
+
+  delay(1);
   initGdt();
+
+  delay(1);
   InitIdt();
+
+  delay(1);
   init_acpi();
 
-  hcf();
+  delay(1);
+
+  halt();
 }

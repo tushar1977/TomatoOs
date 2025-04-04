@@ -3,6 +3,7 @@
 #define KERNEL_H
 
 #include "acpi.h"
+#include "apic.h"
 #include "fb.h"
 #include "flanterm.h"
 #include "gdt.h"
@@ -19,6 +20,9 @@ typedef struct {
   struct flanterm_context *ft_ctx;
   struct gdt_ptr_struct gdtr;
   struct Idt_ptr idtr;
+  uint64_t lapic_base;
+  uint64_t ioapic_addr;
+  IOApic ioapic_device;
   uint64_t hhdm;
   uint64_t kernel_size;
   uint32_t *back_buffer;
