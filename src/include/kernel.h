@@ -33,7 +33,5 @@ typedef struct {
   volatile uint64_t framebuffer_size;
 } Kernel;
 
-void kernel_main(uint32_t magic, struct multiboot_info *bootInfo);
-
 extern Kernel kernel;
 #endif // KERNEL_H

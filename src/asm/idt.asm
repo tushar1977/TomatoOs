@@ -113,6 +113,17 @@ virtualisationException:
     push 0
     push 20
     jmp baseHandler
+global irq0
+irq0:
+    push byte 0     
+    push byte 32   
+    jmp baseHandler
+
+global irq1
+irq1:
+    push byte 0
+    push byte 33
+    jmp baseHandler
 extern exception_handler
 align 8
 baseHandler:

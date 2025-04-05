@@ -15,6 +15,7 @@ struct InterruptDescriptor64 {
   uint32_t reserved;
 } __attribute__((packed));
 
+void exception_handler(struct IDTEFrame registers);
 struct Idt_ptr {
   uint16_t limit;
   uint32_t base;

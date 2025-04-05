@@ -28,4 +28,6 @@ void *find_MADT(RSDT *root_rsdt) {
     if (memcmp(this_header->signature, "APIC", 4))
       return (void *)this_header;
   }
+
+  return NULL;
 }

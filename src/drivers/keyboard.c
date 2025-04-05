@@ -3,6 +3,7 @@
 #include "../include/idt.h"
 #include "../include/kernel.h"
 #include "../include/memory.h"
+#include "../include/printf.h"
 #include "../include/stdio.h"
 #include "../include/string.h"
 #include "stdint.h"
@@ -98,6 +99,68 @@ void clear() {
   while (text[p] != '\0') {
     text[p] = '\0';
     p++;
+  }
+}
+void keyboardHandler(struct IDTEFrame *regs) {
+  char scanCode = inPortB(0x60) & 0x7F;
+  char press = inPortB(0x60) & 0x80;
+  // printf("%d", scanCode);
+
+  switch (scanCode) {
+  case 1:
+  case 29:
+  case 56:
+  case 59:
+  case 60:
+  case 61:
+  case 62:
+  case 63:
+  case 64:
+  case 65:
+  case 66:
+  case 67:
+  case 68:
+  case 87:
+  case 88:
+    break;
+  case 42:
+    if (press == 0) {
+      capsOn = true;
+    } else {
+      capsOn = false;
+    }
+    break;
+  case 58:
+    if (!capsLock && press == 0) {
+      capsLock = true;
+    } else if (capsLock && press == 0) {
+      capsLock = false;
+    }
+    break;
+  default:
+    if (press == 0) {
+      if (scanCode >= 0 && scanCode < 128) {
+        if (capsOn) {
+          kprintf("%c", uppercase[scanCode]);
+        } else if (capsLock) {
+          kprintf("%c", (scanCode >= 'a' && scanCode <= 'z')
+                            ? uppercase[scanCode]
+                            : lowercase[scanCode]);
+        } else {
+          kprintf("%c", lowercase[scanCode]);
+        }
+
+        int i = 0;
+        while (text[i] != '\0' && i < sizeof(text) - 1) {
+          i++;
+        }
+        if (i < sizeof(text) - 1) {
+          text[i] =
+              (capsOn || capsLock) ? uppercase[scanCode] : lowercase[scanCode];
+          text[i + 1] = '\0';
+        }
+      }
+    }
   }
 }
 

@@ -23,15 +23,6 @@ static volatile struct limine_smp_request smp_request = {
 static struct limine_internal_module initrd = {
     .path = "initrd", .flags = LIMINE_INTERNAL_MODULE_REQUIRED};
 
-struct limine_internal_module *module_list = &initrd;
-
-__attribute__((
-    used, section(".requests"))) static volatile struct limine_module_request
-    initrd_request = {.id = LIMINE_MODULE_REQUEST,
-                      .revision = 0,
-                      .internal_modules = &module_list,
-                      .internal_module_count = 1};
-
 static void hcf(void) {
   for (;;) {
 #if defined(__x86_64__)

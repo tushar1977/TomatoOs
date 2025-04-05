@@ -26,5 +26,9 @@ xorriso -as mkisofs -b boot/limine/limine-bios-cd.bin \
   sysroot -o myos.iso
 
 ./limine/limine bios-install myos.iso
-#qemu-system-x86_64 myos.iso -s -no-reboot -d int -D log.txt
-qemu-system-x86_64 myos.iso -s
+
+if [ "$1" == "debug" ]; then
+  qemu-system-x86_64 myos.iso -s -S
+else
+  qemu-system-x86_64 myos.iso -s
+fi

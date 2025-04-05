@@ -52,7 +52,6 @@ void setIdtGate(struct InterruptDescriptor64 *idt_entries, uint8_t num,
   idt_entries[num].flags = flags;
   idt_entries[num].ist = 0;
 }
-
 void exception_handler(struct IDTEFrame registers) {
   asm("cli");
 
@@ -116,9 +115,17 @@ void exception_handler(struct IDTEFrame registers) {
   case 20:
     label = "Virtualization Exception";
     break;
+  case 32:
+    label = "IRQ0: Timer interrupt!\n";
+    break;
+
+  case 33:
+    label = "IRQ1: Keyboard interrupt!\n";
+    break;
   }
 
-  flanterm_write(kernel.ft_ctx, label, strlen(label));
+  kprintf("%s", label);
+  k_fail();
 
   asm("hlt");
 }

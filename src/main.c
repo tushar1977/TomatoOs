@@ -8,8 +8,6 @@
 #include "include/limine.h"
 #include "include/paging.h"
 #include "include/pmm.h"
-#include "include/printf.h"
-#include "include/string.h"
 #include "include/util.h"
 #include "limits.h"
 #include <stdbool.h>
@@ -18,7 +16,7 @@
 
 Kernel kernel = {0};
 
-void clear_framebuffer() {
+void init_framebuffer() {
   uint32_t *fb_addr = (uint32_t *)kernel.framebuffer[0]->address;
   uint64_t width = kernel.framebuffer[0]->width;
   uint64_t height = kernel.framebuffer[0]->height;
@@ -29,8 +27,6 @@ void clear_framebuffer() {
       fb_addr[y * pitch + x] = kernel.bg_colour;
     }
   }
-
-  flanterm_full_refresh(kernel.ft_ctx);
 }
 
 void init_kernel() {
@@ -60,32 +56,14 @@ void init_kernel() {
       1, 0, 0, 0);
 }
 
-void delay(int ticks) {
-  for (volatile int i = 0; i < ticks * 1000000; i++) {
-    __asm__ __volatile__("nop");
-  }
-}
 void kmain(void) {
   init_kernel();
-
-  clear_framebuffer();
-
-  delay(1);
+  init_framebuffer();
   init_PMM();
-
-  delay(1);
   initPML4();
-
-  delay(1);
   initGdt();
-
-  delay(1);
   InitIdt();
-
-  delay(1);
   init_acpi();
-
-  delay(1);
-
+  init_apic();
   halt();
 }

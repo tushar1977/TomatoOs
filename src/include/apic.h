@@ -1,5 +1,6 @@
 #pragma once
 #include "acpi.h"
+#include <stdbool.h>
 #include <stdint.h>
 
 #define LOCAL_APIC 0
@@ -84,3 +85,6 @@ typedef struct {
 } __attribute__((packed)) MADT;
 
 void init_apic();
+
+void map_ioapic(uint8_t vec, uint32_t irq, uint32_t lapic_id, bool polarity,
+                bool trigger);

@@ -1,11 +1,12 @@
 #include "../include/vfs.h"
 #include "../include/memory.h"
+#include "../include/printf.h"
 #include "../include/string.h"
 
 VFS *init_vfs() {
   VFS *vfs = (VFS *)malloc(sizeof(VFS));
   if (vfs == NULL) {
-    printf("Error: Failed to allocate VFS structure\n");
+    kprintf("Error: Failed to allocate VFS structure\n");
     return NULL;
   }
 
@@ -18,7 +19,7 @@ VFS *init_vfs() {
   for (int i = 0; i < MAX_FILES; i++) {
     vfs->inode_table[i] = (Inode *)malloc(sizeof(Inode));
     if (vfs->inode_table[i] == NULL) {
-      printf("Error: Failed to allocate inode\n");
+      kprintf("Error: Failed to allocate inode\n");
       for (int j = 0; j < i; j++) {
         free(vfs->inode_table[j]);
       }
@@ -31,7 +32,7 @@ VFS *init_vfs() {
     vfs->inode_table[i]->mode = 0;
     vfs->inode_table[i]->size = 0;
 
-    printf("%d: free=%d\n", i, vfs->inode_table[i]->free);
+    kprintf("%d: free=%d\n", i, vfs->inode_table[i]->free);
 
     for (int j = 0; j < MAX_BLOCK_NUMBER; j++) {
       vfs->inode_table[i]->blocks[j] = -1;
@@ -40,7 +41,7 @@ VFS *init_vfs() {
 
   vfs->root = (Directory *)malloc(sizeof(Directory));
   if (vfs->root == NULL) {
-    printf("Error: Failed to allocate root directory\n");
+    kprintf("Error: Failed to allocate root directory\n");
     for (int i = 0; i < MAX_FILES; i++) {
       free(vfs->inode_table[i]);
     }
@@ -51,7 +52,7 @@ VFS *init_vfs() {
 
   vfs->root->files = (File *)malloc(INITIAL_CAPACITY * sizeof(File));
   if (vfs->root->files == NULL) {
-    printf("Error: Failed to allocate file array for root directory\n");
+    kprintf("Error: Failed to allocate file array for root directory\n");
     free(vfs->root);
     for (int i = 0; i < MAX_FILES; i++) {
       free(vfs->inode_table[i]);
@@ -79,23 +80,23 @@ VFS *init_vfs() {
     vfs->data_blocks[i].free = 1;
   }
 
-  printf("Total inodes%d\n", vfs->superblock->inode_count);
-  printf("VFS name %s\n", vfs->root->name);
+  kprintf("Total inodes%d\n", vfs->superblock->inode_count);
+  kprintf("VFS name %s\n", vfs->root->name);
   return vfs;
 }
 void create_file(VFS *vfs, const char *name, const char *data,
                  enum vtype VTYPE) {
   // Check if we need to expand the files array
-  printf("DEBUG: Current inode status before allocation:\n");
+  kprintf("DEBUG: Current inode status before allocation:\n");
   for (int i = 0; i < 5; i++) { // Just show first 5 for brevity
-    printf("Inode %d: free=%d\n", i, vfs->inode_table[i]->free);
+    kprintf("Inode %d: free=%d\n", i, vfs->inode_table[i]->free);
   }
   if (vfs->root->file_count >= vfs->root->capacity) {
     vfs->root->capacity *= 2;
     File *nf =
         (File *)realloc(vfs->root->files, vfs->root->capacity * sizeof(File));
     if (nf == NULL) {
-      printf("Error: Memory allocation failed\n");
+      kprintf("Error: Memory allocation failed\n");
       return;
     }
     vfs->root->files = nf;
@@ -107,7 +108,7 @@ void create_file(VFS *vfs, const char *name, const char *data,
     if (vfs->inode_table[i]->free == 1) {
 
       inode_num = i;
-      printf("DEBUG: Selected inode %d as free\n", inode_num);
+      kprintf("DEBUG: Selected inode %d as free\n", inode_num);
       vfs->inode_table[i]->free = 0;
       vfs->inode_table[i]->mode = 0644;
       vfs->inode_table[i]->size = strlen(data);
@@ -118,7 +119,7 @@ void create_file(VFS *vfs, const char *name, const char *data,
   }
 
   if (inode_num == -1) {
-    printf("Error: No free inodes available\n");
+    kprintf("Error: No free inodes available\n");
     return;
   }
 
@@ -138,7 +139,7 @@ void create_file(VFS *vfs, const char *name, const char *data,
     }
 
     if (free_block == -1) {
-      printf("Error: No free data blocks available\n");
+      kprintf("Error: No free data blocks available\n");
       return;
     }
 
@@ -167,13 +168,13 @@ void create_file(VFS *vfs, const char *name, const char *data,
   if (vfs->superblock->free_inodes > 0) {
     vfs->superblock->free_inodes--;
   }
-  printf("DEBUG: Inode status after allocation:\n");
+  kprintf("DEBUG: Inode status after allocation:\n");
   for (int i = 0; i < 5; i++) {
-    printf("Inode %d: free=%d\n", i, vfs->inode_table[i]->free);
+    kprintf("Inode %d: free=%d\n", i, vfs->inode_table[i]->free);
   }
 
-  printf("File '%s' created successfully (inode: %d, blocks used: %d).\n", name,
-         inode_num, block_index);
+  kprintf("File '%s' created successfully (inode: %d, blocks used: %d).\n",
+          name, inode_num, block_index);
 }
 int delete_file(VFS *vfs, const char *name) {
 
@@ -202,23 +203,23 @@ int delete_file(VFS *vfs, const char *name) {
       vfs->total_files--;
       vfs->total_size -= vfs->inode_table[inode_num]->size;
 
-      printf("File '%s' deleted successfully.\n", name);
+      kprintf("File '%s' deleted successfully.\n", name);
       return 0;
     }
   }
-  printf("File not Found");
+  kprintf("File not Found");
   return -1;
 }
 
 int create_directory(VFS *vfs, const char *name) {
   if (strlen(name) > MAX_FILENAME) {
-    printf("Name overflow");
+    kprintf("Name overflow");
     return -1;
   }
 
   for (int i = 0; i < vfs->root->file_count; i++) {
     if (memcmp(vfs->root->files[i].name, name, strlen(name)) == 0) {
-      printf("Already Directory exist %s\n", name);
+      kprintf("Already Directory exist %s\n", name);
     }
   }
 
@@ -241,7 +242,7 @@ int create_directory(VFS *vfs, const char *name) {
   dir->capacity = INITIAL_CAPACITY;
   dir->files = (File *)malloc(dir->capacity * sizeof(File));
   if (!dir->files) {
-    printf("Failed to allocate memory for directory files");
+    kprintf("Failed to allocate memory for directory files");
     free(dir);
     return -1;
   }
@@ -272,19 +273,19 @@ int create_directory(VFS *vfs, const char *name) {
 
   vfs->superblock->inode_count--;
 
-  printf("Directory '%s' created successfully (inode: %d).\n", name,
-         inode_number);
+  kprintf("Directory '%s' created successfully (inode: %d).\n", name,
+          inode_number);
   return 0;
 }
 
 void display_all_files(VFS *vfs) {
-  printf("--ALL FILES--\n");
-  printf("Total files: %d\n", vfs->root->file_count);
+  kprintf("--ALL FILES--\n");
+  kprintf("Total files: %d\n", vfs->root->file_count);
   for (int i = 0; i < vfs->root->file_count; i++) {
     vfs->root->files[i].name[MAX_FILENAME - 1] = '\0';
-    printf("%s\n", vfs->root->files[i].name);
+    kprintf("%s\n", vfs->root->files[i].name);
   }
-  printf("---------------\n");
+  kprintf("---------------\n");
 }
 void display_content(VFS *vfs, const char *name) {
   int inode_num = -1;
@@ -296,23 +297,23 @@ void display_content(VFS *vfs, const char *name) {
   }
 
   if (inode_num == -1) {
-    printf("Error: File '%s' not found.\n", name);
+    kprintf("Error: File '%s' not found.\n", name);
     return;
   }
 
   if (inode_num < 0 || inode_num >= MAX_FILES || !vfs->inode_table[inode_num]) {
-    printf("Error: Invalid inode number %d for file '%s'.\n", inode_num, name);
+    kprintf("Error: Invalid inode number %d for file '%s'.\n", inode_num, name);
     return;
   }
 
   Inode *inode = vfs->inode_table[inode_num];
-  printf("Content of file '%s':\n", name);
+  kprintf("Content of file '%s':\n", name);
 
   for (int i = 0; i < MAX_BLOCK_NUMBER; i++) {
     uint32_t block_number = inode->blocks[i];
     if (block_number != (uint32_t)-1 && block_number < MAX_DATABLOCKS) {
-      printf("%s", vfs->data_blocks[block_number].data);
+      kprintf("%s", vfs->data_blocks[block_number].data);
     }
   }
-  printf("\n");
+  kprintf("\n");
 }
