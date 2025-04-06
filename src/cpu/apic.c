@@ -43,8 +43,10 @@ void map_ioapic(uint8_t vec, uint32_t irq, uint32_t lapic_id, bool polarity,
   kprintf("Global system interrupt base: %d\n",
           kernel.ioapic_device.global_system_interrupt_base);
   uintptr_t ioapic_addr =
-      (uintptr_t)(((uint64_t)kernel.ioapic_device.ioapic_addr) + kernel.hhdm);
+      (uintptr_t)(((uint64_t)kernel.ioapic_device.ioapic_addr));
   uint32_t gsi_base = kernel.ioapic_device.global_system_interrupt_base;
+
+  kprintf("GSI for keyboard: %d\n", gsi_base + irq);
   uint32_t entry_num = gsi_base + (irq * 2);
   kprintf("Entry number: %d\n", entry_num);
   uint32_t reg_nums[2] = {0x10 + entry_num, 0x11 + entry_num};
@@ -102,6 +104,11 @@ void unmask_ioapic(uint8_t irq, uint32_t lapic_id) {
   write_ioapic((void *)ioapic_addr, reg_num, redirection_entry);
 }
 
+void end_of_interrupt() {
+  write_lapic(kernel.lapic_base, LAPIC_END_OF_INTERRUPT_REGISTER, 0);
+  enable_interrupts();
+}
+
 void init_local_apic(uintptr_t lapic_addr) {
 
   k_debug("Setting task priority of LAPIC...");
@@ -118,15 +125,15 @@ void init_local_apic(uintptr_t lapic_addr) {
 
 void init_apic() {
   k_debug("Initiating APIC...\n");
+  outPortB(0x21, 0xff);
+  outPortB(0xA1, 0xff);
+
   if (!verify_apic()) {
 
     k_debug("This device does not support APIC, but rather only legacy PIC. "
             "Halting.\n");
     halt();
   }
-
-  outPortB(0x21, 0xFF);
-  outPortB(0xA1, 0xFF);
 
   MADT *madt = (MADT *)find_MADT(kernel.rsdt);
   kprintf("Local APIC paddr: 0x%x\n", madt->local_apic_addr);
@@ -139,42 +146,37 @@ void init_apic() {
   kernel.lapic_base = (uint64_t)madt->local_apic_addr + kernel.hhdm;
   init_local_apic(kernel.lapic_base);
 
-  MADTEntryHeader *entry = (MADTEntryHeader *)(((uint64_t)madt) + sizeof(MADT));
-  uint64_t incremented = sizeof(MADT);
+  uint64_t offset = sizeof(MADT);
+  uint64_t madt_end = madt->header.length;
 
-  uint8_t type = entry->entry_type;
-  uint8_t length = entry->record_length;
-  switch (type) {
+  while (offset < madt_end) {
+    MADTEntryHeader *entry = (MADTEntryHeader *)(((uint64_t)madt) + offset);
 
-  case IOAPIC: {
+    switch (entry->entry_type) {
+    case IOAPIC: {
+      IOApic *ioapic = (IOApic *)entry;
 
-    IOApic *ioapic = (IOApic *)entry;
+      k_debug("I/O APIC device found. Information:");
+      kprintf(" - I/O APIC ID: %d\n", ioapic->ioapic_id);
+      kprintf(" - I/O APIC address: 0x%x\n", ioapic->ioapic_addr);
+      kprintf(" - Global system interrupt base: %d\n",
+              ioapic->global_system_interrupt_base);
 
-    k_debug("I/O APIC device found. Information:");
-    kprintf(" - I/O APIC ID: %d\n", ioapic->ioapic_id);
-    kprintf(" - I/O APIC address: 0x%x\n", ioapic->ioapic_addr);
-    kprintf(" - Global system interrupt base: %d\n",
-            ioapic->global_system_interrupt_base);
+      kernel.ioapic_device = *ioapic;
+      kernel.ioapic_addr = ioapic->ioapic_addr;
 
-    void *phy = &ioapic->ioapic_addr;
-    map_page((uint64_t)ioapic->ioapic_addr, (uint64_t)getPhysicalAddress(phy),
-             KERNEL_PFLAG_PRESENT | KERNEL_PFLAG_WRITE,
-             (sizeof((uint64_t)ioapic->ioapic_addr) + 4095) / 4096);
+      break;
+    }
 
-    kernel.ioapic_addr = ioapic->ioapic_addr;
-    kernel.ioapic_device = *ioapic;
-    break;
+    case LOCAL_APIC: {
+      ProcessorLocalAPIC *lapic = (ProcessorLocalAPIC *)entry;
+      k_debug("Processor local APIC device found. Information");
+      kprintf(" - Processor ID: %d\n", lapic->processor_id);
+      kprintf(" - APIC ID: %d\n", lapic->apic_id);
+      break;
+    }
+    }
+
+    offset += entry->record_length;
   }
-
-  case LOCAL_APIC: {
-
-    ProcessorLocalAPIC *this_local_apic = (ProcessorLocalAPIC *)entry;
-    k_debug("Processor local APIC device found. Information");
-    kprintf(" - Processor ID: %i\n", this_local_apic->processor_id);
-    kprintf(" - APIC ID: %d\n", this_local_apic->apic_id);
-    break;
-  }
-  }
-
-  k_debug("APIC set up successfully.");
 }
