@@ -25,7 +25,8 @@ void *find_MADT(RSDT *root_rsdt) {
   for (size_t i = 0; i < num_entries; i++) {
     ISDTHeader *this_header =
         (ISDTHeader *)(root_rsdt->entries[i] + kernel.hhdm);
-    if (memcmp(this_header->signature, "APIC", 4))
+
+    if (memcmp(this_header->signature, "APIC", 4) == 0)
       return (void *)this_header;
   }
 
