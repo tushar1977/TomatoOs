@@ -1,6 +1,7 @@
 #include "../include/idt.h"
 #include "../include/fb.h"
 #include "../include/kernel.h"
+#include "../include/keyboard.h"
 #include "../include/paging.h"
 #include "../include/pmm.h"
 #include "../include/printf.h"
@@ -9,6 +10,7 @@
 #include "../include/util.h"
 #include "stdint.h"
 
+__attribute__((interrupt)) void spurious_irq(void *) { end_of_interrupt(); }
 void InitIdt() {
   struct InterruptDescriptor64 *IDT =
       (struct InterruptDescriptor64
@@ -34,6 +36,7 @@ void InitIdt() {
   setIdtGate(IDT, 18, &machineCheckException, 0x08, 0x8E);
   setIdtGate(IDT, 19, &simdFloatingPointException, 0x08, 0x8E);
   setIdtGate(IDT, 20, &virtualisationException, 0x08, 0x8E);
+  setIdtGate(IDT, 33, &keyboardHandler, 0x08, 0x8E);
 
   kernel.idtr.base = (uint64_t)IDT;
   kernel.idtr.limit = (sizeof(struct InterruptDescriptor64) * 256) - 1;
@@ -53,10 +56,8 @@ void setIdtGate(struct InterruptDescriptor64 *idt_entries, uint8_t num,
   idt_entries[num].ist = 0;
 }
 void exception_handler(struct IDTEFrame registers) {
-  asm("cli");
-
+  disable_interrupts();
   const char *label = "Unknown Exception";
-
   switch (registers.type) {
   case 0:
     label = "Divide by Zero Exception";
@@ -114,13 +115,6 @@ void exception_handler(struct IDTEFrame registers) {
     break;
   case 20:
     label = "Virtualization Exception";
-    break;
-  case 32:
-    label = "IRQ0: Timer interrupt!\n";
-    break;
-
-  case 33:
-    label = "IRQ1: Keyboard interrupt!\n";
     break;
   }
 

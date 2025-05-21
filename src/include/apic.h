@@ -3,25 +3,28 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define LOCAL_APIC 0
-#define IOAPIC 1
+// APIC Types
+#define APIC_TYPE_LOCAL 0
+#define APIC_TYPE_IO 1
+#define APIC_TYPE_IO_OVERRIDE 2
 
+// Local APIC Registers (offsets from LAPIC base)
 #define LAPIC_ID_REGISTER 0x020
-#define LAPIC_SPURIOUS_INTERRUPT_VECTOR_REGISTER 0x0f0
-#define LAPIC_DESTINATION_FORMAT_REGISTER 0x0e0
 #define LAPIC_TASK_PRIORITY_REGISTER 0x080
-#define LAPIC_END_OF_INTERRUPT_REGISTER 0x0b0
-#define LAPIC_TIMER_DIVIDER_REGISTER 0x3e0
+#define LAPIC_DESTINATION_FORMAT_REGISTER 0x0E0
+#define LAPIC_SPURIOUS_INTERRUPT_VECTOR_REGISTER 0x0F0
+#define LAPIC_EOI_REGISTER 0x0B0
+#define LAPIC_ERROR_STATUS_REGISTER 0x280
+#define LAPIC_TIMER_LVT_REGISTER 0x320
 #define LAPIC_TIMER_INITIAL_COUNT_REGISTER 0x380
 #define LAPIC_TIMER_CURRENT_COUNT_REGISTER 0x390
-#define LAPIC_TIMER_LVT_REGISTER 0x320
-#define LAPIC_ERROR_STATUS_REGISTER 0x280
+#define LAPIC_TIMER_DIVIDER_REGISTER 0x3E0
 
+// IRQ Flags
 #define POLARITY_HIGH 0
 #define POLARITY_LOW 1
-#define TRIGGER_LEVEL 1
 #define TRIGGER_EDGE 0
-
+#define TRIGGER_LEVEL 1
 typedef struct {
   uint8_t entry_type;
   uint8_t record_length;
@@ -86,5 +89,10 @@ typedef struct {
 
 void init_apic();
 
-void map_ioapic(uint8_t vec, uint32_t irq, uint32_t lapic_id, bool polarity,
-                bool trigger);
+void end_of_interrupt();
+
+void set_ioapic_entry(uint8_t vector, uint8_t irq, uint64_t flags,
+                      uint64_t lapic);
+void unmask_ioapic(uint32_t gsi, uint32_t lapic_id);
+
+void write_lapic(uintptr_t lapic_addr, uint64_t reg_offset, uint32_t val);

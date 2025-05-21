@@ -30,5 +30,6 @@ xorriso -as mkisofs -b boot/limine/limine-bios-cd.bin \
 if [ "$1" == "debug" ]; then
   qemu-system-x86_64 myos.iso -s -S
 else
-  qemu-system-x86_64 myos.iso -s
+  qemu-system-x86_64 myos.iso -s -d int
+
 fi

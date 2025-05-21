@@ -17,9 +17,8 @@ global alignmentCheckException
 global machineCheckException
 global simdFloatingPointException
 global virtualisationException
-
+global irq1
 global idt_flush
-
 idt_flush:
     cli                 ; Disable interrupts
     lidt [rdi]         ; Load the new IDT from the address in RDI
@@ -113,17 +112,11 @@ virtualisationException:
     push 0
     push 20
     jmp baseHandler
-global irq0
-irq0:
-    push byte 0     
-    push byte 32   
+irq1:
+    push 0
+    push 33
     jmp baseHandler
 
-global irq1
-irq1:
-    push byte 0
-    push byte 33
-    jmp baseHandler
 extern exception_handler
 align 8
 baseHandler:

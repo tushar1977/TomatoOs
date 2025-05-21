@@ -5,9 +5,11 @@
 #include "include/gdt.h"
 #include "include/idt.h"
 #include "include/kernel.h"
+#include "include/keyboard.h"
 #include "include/limine.h"
 #include "include/paging.h"
 #include "include/pmm.h"
+#include "include/printf.h"
 #include "include/util.h"
 #include "limits.h"
 #include <stdbool.h>
@@ -65,5 +67,7 @@ void kmain(void) {
   InitIdt();
   init_acpi();
   init_apic();
+  initKeyboard();
+
   halt();
 }

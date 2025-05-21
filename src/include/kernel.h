@@ -23,6 +23,7 @@ typedef struct {
   uint64_t lapic_base;
   uint64_t ioapic_addr;
   IOApic ioapic_device;
+  IOApicInterruptSourceOverride *iso;
   uint64_t hhdm;
   uint64_t kernel_size;
   uint32_t *back_buffer;
@@ -30,6 +31,7 @@ typedef struct {
   uint32_t fg_colour;
   uint32_t bg_colour;
   uint64_t cr3;
+  uint32_t irq_overrides[16];
   volatile uint64_t framebuffer_size;
 } Kernel;
 

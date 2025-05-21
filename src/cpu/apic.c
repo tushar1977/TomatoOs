@@ -14,120 +14,90 @@ bool verify_apic() {
   cpuid(1, &eax, &edx);
   return edx & (1 << 9);
 }
+
 uint32_t read_ioapic(void *ioapic_addr, uint32_t reg) {
-  uint32_t volatile *ioapic = (uint32_t volatile *)ioapic_addr;
-  ioapic[0] = (reg & 0xff);
-  return ioapic[4];
+  uint64_t virt = (uint64_t)(ioapic_addr + kernel.hhdm);
+  *(volatile uint32_t *)virt = reg;
+  return *(volatile uint32_t *)(virt + 0x10);
 }
 
 void write_ioapic(void *ioapic_addr, uint32_t reg, uint32_t value) {
-  uint32_t volatile *ioapic = (uint32_t volatile *)ioapic_addr;
-  ioapic[0] = (reg & 0xff);
-  ioapic[4] = value;
+  *(volatile uint32_t *)ioapic_addr = reg;
+  *(volatile uint32_t *)(ioapic_addr + 0x10) = value;
 }
 
-uint32_t read_lapic(uintptr_t lapic_addr, uint64_t reg_offset) {
-  uint32_t volatile *lapic_register_addr =
-      (uint32_t volatile *)(((uint64_t)lapic_addr) + reg_offset);
-  return (uint32_t)*lapic_register_addr;
+uint32_t read_lapic(uintptr_t lapic_base, uint32_t reg) {
+  return *(volatile uint32_t *)(lapic_base + reg);
 }
-
 void write_lapic(uintptr_t lapic_addr, uint64_t reg_offset, uint32_t val) {
   uint32_t volatile *lapic_register_addr =
       (uint32_t volatile *)(((uint64_t)lapic_addr) + reg_offset);
   *lapic_register_addr = val;
 }
 
-void map_ioapic(uint8_t vec, uint32_t irq, uint32_t lapic_id, bool polarity,
-                bool trigger) {
-  kprintf("Global system interrupt base: %d\n",
-          kernel.ioapic_device.global_system_interrupt_base);
-  uintptr_t ioapic_addr =
-      (uintptr_t)(((uint64_t)kernel.ioapic_device.ioapic_addr));
-  uint32_t gsi_base = kernel.ioapic_device.global_system_interrupt_base;
+void set_ioapic_entry(uint8_t vector, uint8_t irq, uint64_t flags,
+                      uint64_t lapic) {
 
-  kprintf("GSI for keyboard: %d\n", gsi_base + irq);
-  uint32_t entry_num = gsi_base + (irq * 2);
-  kprintf("Entry number: %d\n", entry_num);
-  uint32_t reg_nums[2] = {0x10 + entry_num, 0x11 + entry_num};
-  kprintf("Register numbers: %d and %d\n", reg_nums[0], reg_nums[1]);
-  uint32_t redirection_entries[2] = {
-      read_ioapic((void *)ioapic_addr, reg_nums[0]),
-      read_ioapic((void *)ioapic_addr, reg_nums[1])};
+  uint64_t ioapic_info = (lapic << 56) | flags | (vector & 0xFF);
 
-  redirection_entries[0] =
-      (redirection_entries[0] & ~0xFF) | vec; // set vector number
-  redirection_entries[0] &= ~0x700;           // set delivery mode to normal
-  redirection_entries[0] &=
-      ~0x800; // set destination mode to physical. Probably worse but for now
-              // it's just easier.
-  if (polarity)
-    redirection_entries[0] |= 0x2000; // set polarity to low
-  else
-    redirection_entries[0] &= ~0x2000; // set polarity to high
-  if (trigger)
-    redirection_entries[0] |= 0x8000; // set trigger to level
-  else
-    redirection_entries[0] &= ~0x8000; // set trigger to edge
-  redirection_entries[0] &= ~0x10000;  // makes sure that it's unmasked
+  if (kernel.iso) {
+    char polarity = (kernel.iso->flags & 0b11) == 0b11 ? 1 : 0;
+    char mode = ((kernel.iso->flags >> 2) & 0b11) == 0b11 ? 1 : 0;
+    ioapic_info = ((uint64_t)lapic << 56) | (mode << 15) | (polarity << 13) |
+                  (vector & 0xFF) | flags;
+  }
 
-  kprintf("Done! New value: 0x%x\n", redirection_entries[0]);
+  uint32_t apic_ver = read_ioapic((void *)kernel.ioapic_addr, 1);
+  uint32_t max_redirectional_entry = apic_ver >> 16;
 
-  kprintf("Trying to set entry two...\n");
-  redirection_entries[1] = (lapic_id & 0xF) << 28;
-  kprintf("Done, new value: 0x%x\n", redirection_entries[1]);
-  kprintf("Trying to set new entries...\n");
-  write_ioapic((void *)ioapic_addr, reg_nums[0], redirection_entries[0]);
-  write_ioapic((void *)ioapic_addr, reg_nums[1], redirection_entries[1]);
-  k_debug("Done, this IOAPIC IRQ has been mapped and unmasked.");
+  uint32_t irq_register =
+      ((irq - kernel.ioapic_device.global_system_interrupt_base) * 2) + 0x10;
+
+  write_ioapic((void *)kernel.ioapic_addr, irq_register, (uint32_t)ioapic_info);
+  write_ioapic((void *)kernel.ioapic_addr, irq_register + 1,
+               (uint32_t)((uint64_t)ioapic_info >> 32));
 }
 
-void mask_ioapic(uint8_t irq, uint32_t lapic_id) {
-  uintptr_t ioapic_addr =
-      (uintptr_t)(((uint64_t)kernel.ioapic_device.ioapic_addr) + kernel.hhdm);
-  uint32_t gsi_base = kernel.ioapic_device.global_system_interrupt_base;
-  uint32_t entry_num = gsi_base + (irq * 2);
-  uint32_t reg_num = 0x10 + entry_num;
-  uint32_t redirection_entry = read_ioapic((void *)ioapic_addr, reg_num);
-  redirection_entry |= 0x10000;
-  write_ioapic((void *)ioapic_addr, reg_num, redirection_entry);
+void unmask_ioapic(uint32_t gsi, uint32_t lapic_id) {
+  uintptr_t ioapic_addr = (uintptr_t)kernel.ioapic_device.ioapic_addr;
+  uint32_t entry = gsi * 2;
+  uint32_t reg_low = 0x10 + entry;
+
+  uint32_t low = read_ioapic((void *)ioapic_addr, reg_low);
+  low &= ~(1 << 16);
+  write_ioapic((void *)ioapic_addr, reg_low, low);
 }
 
-void unmask_ioapic(uint8_t irq, uint32_t lapic_id) {
-  uintptr_t ioapic_addr =
-      (uintptr_t)(((uint64_t)kernel.ioapic_device.ioapic_addr) + kernel.hhdm);
-  uint32_t gsi_base = kernel.ioapic_device.global_system_interrupt_base;
-  uint32_t entry_num = gsi_base + (irq * 2);
-  uint32_t reg_num = 0x10 + entry_num;
-  uint32_t redirection_entry = read_ioapic((void *)ioapic_addr, reg_num);
-  redirection_entry &= ~0x10000;
-  write_ioapic((void *)ioapic_addr, reg_num, redirection_entry);
-}
+void mask_ioapic(uint32_t gsi, uint32_t lapic_id) {
+  uintptr_t ioapic_addr = (uintptr_t)kernel.ioapic_device.ioapic_addr;
+  uint32_t entry = gsi * 2;
+  uint32_t reg_low = 0x10 + entry;
 
+  uint32_t low = read_ioapic((void *)ioapic_addr, reg_low);
+  low |= (1 << 16); // Set mask bit
+  write_ioapic((void *)ioapic_addr, reg_low, low);
+}
 void end_of_interrupt() {
-  write_lapic(kernel.lapic_base, LAPIC_END_OF_INTERRUPT_REGISTER, 0);
-  enable_interrupts();
+  write_lapic(kernel.lapic_base, LAPIC_EOI_REGISTER, 0);
 }
 
 void init_local_apic(uintptr_t lapic_addr) {
 
-  k_debug("Setting task priority of LAPIC...");
-  write_lapic(lapic_addr, LAPIC_TASK_PRIORITY_REGISTER, 0);
+  uint32_t tpr = read_lapic(lapic_addr, LAPIC_TASK_PRIORITY_REGISTER);
+  kprintf("LAPIC Task Priority Register: %x\n", tpr);
 
-  k_debug("Setting LAPIC destination format to flat mode...");
-  write_lapic(lapic_addr, LAPIC_DESTINATION_FORMAT_REGISTER, 0xF0000000);
+  uint32_t dfr = read_lapic(lapic_addr, LAPIC_DESTINATION_FORMAT_REGISTER);
+  kprintf("LAPIC Destination Format Register: %x\n", dfr);
 
-  k_debug("Setting spurious interrupt vector (and enabling this LAPIC)...");
-  write_lapic(lapic_addr, LAPIC_SPURIOUS_INTERRUPT_VECTOR_REGISTER,
-              0xFF | 0x100);
+  uint32_t svr =
+      read_lapic(lapic_addr, LAPIC_SPURIOUS_INTERRUPT_VECTOR_REGISTER);
+  kprintf("LAPIC Spurious Interrupt Vector Register: %x\n", svr);
   k_debug("This LAPIC was successfully set up!");
 }
 
 void init_apic() {
   k_debug("Initiating APIC...\n");
-  outPortB(0x21, 0xff);
-  outPortB(0xA1, 0xff);
-
+  disableLegacyPIC();
   if (!verify_apic()) {
 
     k_debug("This device does not support APIC, but rather only legacy PIC. "
@@ -136,12 +106,11 @@ void init_apic() {
   }
 
   MADT *madt = (MADT *)find_MADT(kernel.rsdt);
-  kprintf("Local APIC paddr: 0x%x\n", madt->local_apic_addr);
+  kprintf("Local APIC paddr: %x\n", madt->local_apic_addr);
 
   map_page((uint64_t)madt->local_apic_addr + kernel.hhdm,
            (uint64_t)madt->local_apic_addr,
-           KERNEL_PFLAG_PRESENT | KERNEL_PFLAG_WRITE,
-           ((sizeof((uint64_t)madt) + 4095) / 4096));
+           KERNEL_PFLAG_PRESENT | KERNEL_PFLAG_WRITE, 1);
 
   kernel.lapic_base = (uint64_t)madt->local_apic_addr + kernel.hhdm;
   init_local_apic(kernel.lapic_base);
@@ -153,7 +122,7 @@ void init_apic() {
     MADTEntryHeader *entry = (MADTEntryHeader *)(((uint64_t)madt) + offset);
 
     switch (entry->entry_type) {
-    case IOAPIC: {
+    case APIC_TYPE_IO: {
       IOApic *ioapic = (IOApic *)entry;
 
       k_debug("I/O APIC device found. Information:");
@@ -168,12 +137,22 @@ void init_apic() {
       break;
     }
 
-    case LOCAL_APIC: {
+    case APIC_TYPE_LOCAL: {
       ProcessorLocalAPIC *lapic = (ProcessorLocalAPIC *)entry;
       k_debug("Processor local APIC device found. Information");
       kprintf(" - Processor ID: %d\n", lapic->processor_id);
       kprintf(" - APIC ID: %d\n", lapic->apic_id);
       break;
+    }
+
+    case APIC_TYPE_IO_OVERRIDE: {
+      IOApicInterruptSourceOverride *iso =
+          (IOApicInterruptSourceOverride *)entry;
+
+      kprintf("IRQ Override: IRQ %d → GSI %d, flags: %x\n", iso->irq_source,
+              iso->global_system_interrupt, iso->flags);
+      kernel.irq_overrides[iso->irq_source] = iso->global_system_interrupt;
+      kernel.iso = iso;
     }
     }
 

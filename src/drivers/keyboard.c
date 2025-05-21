@@ -48,17 +48,8 @@ const uint32_t NONE = 0xFFFFFFFF - 30;
 const uint32_t ALTGR = 0xFFFFFFFF - 31;
 const uint32_t NUMLCK = 0xFFFFFFFF - 32;
 
-char *slice(const char *str, size_t start, size_t end) {
-  size_t len = end - start;
-  char *result = (char *)malloc(len + 1);
-  if (!result) {
-    return NULL;
-  }
-  memcpy(result, str + start, len);
-  result[len] = '\0';
-  return result;
-}
 const uint32_t lowercase[128] = {
+
     UNKNOWN, ESC,     '1',     '2',     '3',     '4',     '5',     '6',
     '7',     '8',     '9',     '0',     '-',     '=',     '\b',    '\t',
     'q',     'w',     'e',     'r',     't',     'y',     'u',     'i',
@@ -93,78 +84,65 @@ const uint32_t uppercase[128] = {
     UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN,
     UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN,
     UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN};
-
-void clear() {
-  uint8_t p = 0;
-  while (text[p] != '\0') {
-    text[p] = '\0';
-    p++;
-  }
-}
-void keyboardHandler(struct IDTEFrame *regs) {
-  char scanCode = inPortB(0x60) & 0x7F;
-  char press = inPortB(0x60) & 0x80;
-  // printf("%d", scanCode);
+void keyboardHandler(struct IDTEFrame registers) {
+  uint8_t scanCode = inPortB(0x60);
+  bool keyReleased = (scanCode & 0x80) != 0;
+  scanCode &= 0x7F;
+  kprintf("%x\n", scanCode);
 
   switch (scanCode) {
-  case 1:
-  case 29:
-  case 56:
-  case 59:
-  case 60:
-  case 61:
-  case 62:
-  case 63:
-  case 64:
-  case 65:
-  case 66:
-  case 67:
-  case 68:
-  case 87:
-  case 88:
+  case 1:  // Escape key
+  case 29: // Ctrl
+  case 56: // Alt
+  case 59: // F1
+  case 60: // F2
+  case 61: // F3
+  case 62: // F4
+  case 63: // F5
+  case 64: // F6
+  case 65: // F7
+  case 66: // F8
+  case 67: // F9
+  case 68: // F10
+  case 87: // F11
+  case 88: // F12
     break;
-  case 42:
-    if (press == 0) {
-      capsOn = true;
-    } else {
-      capsOn = false;
-    }
+  case 42:                 // Shift
+    capsOn = !keyReleased; // True on press, false on release
     break;
-  case 58:
-    if (!capsLock && press == 0) {
-      capsLock = true;
-    } else if (capsLock && press == 0) {
-      capsLock = false;
+  case 58: // Caps Lock - toggle on press only
+    if (!keyReleased) {
+      capsLock = !capsLock;
     }
     break;
   default:
-    if (press == 0) {
+    if (!keyReleased) {
       if (scanCode >= 0 && scanCode < 128) {
-        if (capsOn) {
-          kprintf("%c", uppercase[scanCode]);
-        } else if (capsLock) {
-          kprintf("%c", (scanCode >= 'a' && scanCode <= 'z')
-                            ? uppercase[scanCode]
-                            : lowercase[scanCode]);
+        char c;
+        if (capsOn || capsLock) {
+          c = uppercase[scanCode];
         } else {
-          kprintf("%c", lowercase[scanCode]);
+          c = lowercase[scanCode];
         }
+
+        kprintf("%c", c);
 
         int i = 0;
         while (text[i] != '\0' && i < sizeof(text) - 1) {
           i++;
         }
         if (i < sizeof(text) - 1) {
-          text[i] =
-              (capsOn || capsLock) ? uppercase[scanCode] : lowercase[scanCode];
+          text[i] = c;
           text[i + 1] = '\0';
         }
       }
     }
   }
-}
 
+  end_of_interrupt();
+}
 void initKeyboard() {
   capsOn = false;
   capsLock = false;
+  kprintf("Keyboard interrupt setup complete\n");
 }
