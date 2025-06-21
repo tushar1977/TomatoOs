@@ -5,7 +5,7 @@
 #else
 
 #include <uacpi/helpers.h>
-#include <uacpi/types.h>
+#include <uacpi/log.h>
 
 /*
  * =======================
@@ -81,6 +81,15 @@ UACPI_BUILD_BUG_ON_WITH_MSG(
  */
 
 /*
+ * Makes uACPI use the internal versions of mem{cpy,move,set,cmp} instead of
+ * relying on the host to provide them. Note that compilers like clang and GCC
+ * rely on these being available by default, even in freestanding mode, so
+ * compiling uACPI may theoretically generate implicit dependencies on them
+ * even if this option is defined.
+ */
+// #define UACPI_USE_BUILTIN_STRING
+
+/*
  * Turns uacpi_phys_addr and uacpi_io_addr into a 32-bit type, and adds extra
  * code for address truncation. Needed for e.g. i686 platforms without PAE
  * support.
@@ -93,6 +102,29 @@ UACPI_BUILD_BUG_ON_WITH_MSG(
  * lock, and other full-hardware features.
  */
 // #define UACPI_REDUCED_HARDWARE
+
+/*
+ * Switches uACPI into tables-subsystem-only mode and strips all other code.
+ * This means only the table API will be usable, no other subsystems are
+ * compiled in. In this mode, uACPI only depends on the following kernel APIs:
+ * - uacpi_kernel_get_rsdp
+ * - uacpi_kernel_{map,unmap}
+ * - uacpi_kernel_log
+ *
+ * Use uacpi_setup_early_table_access to initialize, uacpi_state_reset to
+ * deinitialize.
+ *
+ * This mode is primarily designed for these three use-cases:
+ * - Bootloader/pre-kernel environments that need to parse ACPI tables, but
+ *   don't actually need a fully-featured AML interpreter, and everything else
+ *   that a full APCI implementation entails.
+ * - A micro-kernel that has the full AML interpreter running in userspace, but
+ *   still needs to parse ACPI tables to bootstrap allocators, timers, SMP etc.
+ * - A WIP kernel that needs to parse ACPI tables for bootrapping SMP/timers,
+ *   ECAM, etc., but doesn't yet have enough subsystems implemented in order
+ *   to run a fully-featured AML interpreter.
+ */
+// #define UACPI_BAREBONES_MODE
 
 /*
  * =============

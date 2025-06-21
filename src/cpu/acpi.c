@@ -1,9 +1,9 @@
-#include "../../include/acpi.h"
-#include "../../include/flanterm.h"
-#include "../../include/kernel.h"
-#include "../../include/paging.h"
-#include "../../include/printf.h"
-#include "../../include/string.h"
+#include "../include/flanterm.h"
+#include "../include/kernel.h"
+#include "../include/paging.h"
+#include "../include/printf.h"
+#include "../include/string.h"
+#include <include/acpi.h>
 void init_acpi() {
   if (kernel.rsdp_table->revision != 0) {
     halt();

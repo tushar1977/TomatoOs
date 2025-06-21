@@ -1,8 +1,9 @@
-#ifndef UTIL_H
-#define UTIL_H
-
+#pragma once
+#include "string.h"
 #include <stdint.h>
 
+#define PCI_CONFIG_ADDRESS 0xCF8
+#define PCI_CONFIG_DATA 0xCFC
 #define CEIL_DIV(a, b) (((a + b) - 1) / b)
 
 void outPortB(uint16_t port, uint8_t value);
@@ -43,4 +44,9 @@ void disableLegacyPIC();
 void wait_for_interrupt();
 void halt();
 void cpuid(int code, uint32_t *a, uint32_t *d);
-#endif
+
+uint16_t pciConfigReadWord(uint8_t bus, uint8_t slot, uint8_t func,
+                           uint8_t offset);
+
+void ConfigWriteDword(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset,
+                      uint32_t conf);
