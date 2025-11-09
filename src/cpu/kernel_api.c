@@ -13,7 +13,9 @@
 // Returns the PHYSICAL address of the RSDP structure via *out_rsdp_address.
 uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
 
-  *out_rsdp_address = kernel.rsdp_table->rsdt_address;
+  *out_rsdp_address =
+      (uint64_t)(getPhysicalAddress((void *)kernel.rsdp_address));
+  kprintf("%x", kernel.rsdp_address);
   return UACPI_STATUS_OK;
 }
 

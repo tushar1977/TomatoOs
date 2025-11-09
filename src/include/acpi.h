@@ -28,5 +28,6 @@ typedef struct {
 
 void init_acpi();
 
+void acpi_init(void);
 void *find_MADT(RSDT *root_rsdt);
 #endif

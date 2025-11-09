@@ -1,7 +1,6 @@
 bin/
 .cache/
-src/include/uacpi
-src/uacpi/
+src/include/uacpi/
 *.json
 limine/
 obj/

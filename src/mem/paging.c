@@ -23,6 +23,18 @@ uint64_t readCR3(void) {
   return val;
 }
 
+void map_memoryEntry() {
+  for (size_t i = 0; i < kernel.memmap.entry_count; i++) {
+    struct limine_memmap_entry *entry = kernel.memmap.entries[i];
+    if (entry->type == LIMINE_MEMMAP_USABLE) {
+      for (size_t i = entry->base; i < entry->base + entry->length; i += 4096) {
+        map_page((uint64_t)i + kernel.hhdm, (uint64_t)i,
+                 KERNEL_PFLAG_PRESENT | KERNEL_PFLAG_WRITE, 4096);
+      }
+    }
+  }
+}
+
 void map_sections() {
   uint64_t v_add = physical.base;
   size_t pages = (physical.size) / 4096;
@@ -30,6 +42,7 @@ void map_sections() {
   map_page(physical.base + kernel.hhdm, physical.base,
            KERNEL_PFLAG_PRESENT | KERNEL_PFLAG_WRITE, pages);
 }
+
 void map_kernel() {
   uint64_t p_kernel = kernel.kernel_addr.physical_base;
   uint64_t v_kernel = kernel.kernel_addr.virtual_base;
@@ -58,7 +71,10 @@ PageTable *initPML4() {
   k_debug("Initialising Page Tables...");
   uintptr_t cr3 = (uintptr_t)readCR3();
   PML4 = (PageTable *)((cr3 >> 12) << 12);
+  k_debug("Mapping kernel...");
   map_kernel();
+
+  k_debug("Mapping usable mem...");
   kernel.cr3 = (uint64_t)(PML4 + kernel.hhdm) - kernel.hhdm;
   return PML4;
 }

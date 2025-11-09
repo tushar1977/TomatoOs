@@ -40,6 +40,7 @@ void init_kernel() {
   kernel.kernel_file = *(kernel_file_req.response);
   kernel.kernel_size = (uint64_t)kernel.kernel_file.kernel_file->size;
   kernel.rsdp_table = (RSDP *)(rsdp_request.response)->address;
+  kernel.rsdp_address = (uint64_t)rsdp_request.response->address;
   kernel.memmap = *memmap_request.response;
   kernel.hhdm = (hhdm_request.response)->offset;
   kernel.framebuffer = fb_request.response->framebuffers;
@@ -65,9 +66,7 @@ void kmain(void) {
   initPML4();
   initGdt();
   InitIdt();
-  init_acpi();
-  init_apic();
-  initKeyboard();
+  acpi_init();
 
   halt();
 }

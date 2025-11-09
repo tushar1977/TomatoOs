@@ -21,6 +21,7 @@ typedef struct {
   struct gdt_ptr_struct gdtr;
   struct Idt_ptr idtr;
   uint64_t lapic_base;
+  uint64_t rsdp_address;
   uint64_t ioapic_addr;
   IOApic ioapic_device;
   IOApicInterruptSourceOverride *iso;
