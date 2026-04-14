@@ -63,9 +63,11 @@ void kmain(void) {
   init_kernel();
   init_framebuffer();
   init_PMM();
+
   initPML4();
   initGdt();
   InitIdt();
+  init_apic();
   acpi_init();
 
   halt();

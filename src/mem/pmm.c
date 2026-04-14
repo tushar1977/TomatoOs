@@ -20,6 +20,7 @@ void init_PMM() {
 
   physical.base = largest->base;
   physical.size = largest->length;
+  printMemoryMaps();
 }
 
 void printMemoryMaps() {
@@ -100,6 +101,27 @@ void *k_malloc(size_t size) {
 }
 
 void k_free(void *base) {
-  uint64_t size = *(((uint64_t *)base) - 1);
-  memset(base, 0, size);
+
+  if (base == NULL)
+    return;
+  uint64_t *header = ((uint64_t *)base) - 1;
+  uint64_t size = *header;
+
+  memset(header, 0, sizeof(uint64_t) + sizeof(void *) * size);
+}
+uint64_t pmm_alloc_page(void) {
+  void *page = k_malloc(4096);
+  if (page == NULL) {
+    return 0;
+  }
+
+  uint64_t virt_addr = (uint64_t)page;
+  uint64_t phys_addr = virt_addr - kernel.hhdm;
+
+  return phys_addr;
+}
+
+void pmm_free_page(uint64_t phys_addr) {
+  void *virt_addr = (void *)(phys_addr + kernel.hhdm);
+  k_free(virt_addr);
 }

@@ -56,6 +56,7 @@ void setIdtGate(struct InterruptDescriptor64 *idt_entries, uint8_t num,
   idt_entries[num].ist = 0;
 }
 void exception_handler(struct IDTEFrame registers) {
+  dump_Registers(registers);
   disable_interrupts();
   const char *label = "Unknown Exception";
   switch (registers.type) {

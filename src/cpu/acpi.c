@@ -8,20 +8,7 @@
 #include "uacpi/uacpi.h"
 #include <include/acpi.h>
 #include <uacpi/event.h>
-void init_acpi() {
-  if (kernel.rsdp_table->revision != 0) {
-    halt();
-  }
-
-  map_page((uint64_t)kernel.rsdp_table->rsdt_address + kernel.hhdm,
-           (uint64_t)kernel.rsdp_table->rsdt_address, KERNEL_PFLAG_PRESENT, 1);
-
-  RSDT *rsdt = (RSDT *)(kernel.rsdp_table->rsdt_address + kernel.hhdm);
-  uint64_t rsdt_num_entries = (rsdt->header.length - sizeof(rsdt->header)) / 4;
-  kernel.rsdt = rsdt;
-
-  k_debug("Initialising ACPI...");
-}
+void init_acpi() {}
 
 void *find_MADT(RSDT *root_rsdt) {
   uint64_t num_entries =

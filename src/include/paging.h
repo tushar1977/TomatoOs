@@ -8,6 +8,7 @@
   0b10000000000000000000000000000000000000000000000000000000000000 // a bit long
                                                                    // lmao
 #define PTE_PRESENT (1 << 0)
+#define PTE_NO_EXECUTE (1ULL << 63)
 #define PTE_WRITABLE (1 << 1)
 #define PTE_USER (1 << 2)
 #define PTE_HUGE (1 << 7)
@@ -40,4 +41,5 @@ void map_page(uint64_t virt, uint64_t phys, uint64_t flags, size_t size);
 uint64_t readCR3(void);
 void *getPhysicalAddress(void *virtual_address);
 
+uint64_t virt_to_phys(void *virt);
 void map_sections();

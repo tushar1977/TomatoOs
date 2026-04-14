@@ -97,6 +97,19 @@ void init_local_apic(uintptr_t lapic_addr) {
 
 void init_apic() {
   k_debug("Initiating APIC...\n");
+
+  if (kernel.rsdp_table->revision != 0) {
+    halt();
+  }
+
+  // map_page((uint64_t)kernel.rsdp_table->rsdt_address + kernel.hhdm,
+  //          (uint64_t)kernel.rsdp_table->rsdt_address, KERNEL_PFLAG_PRESENT,
+  //          1);
+
+  RSDT *rsdt = (RSDT *)(kernel.rsdp_table->rsdt_address + kernel.hhdm);
+  kernel.rsdt = rsdt;
+
+  k_debug("RSDT mapped!");
   disableLegacyPIC();
   if (!verify_apic()) {
 
@@ -108,9 +121,9 @@ void init_apic() {
   MADT *madt = (MADT *)find_MADT(kernel.rsdt);
   kprintf("Local APIC paddr: %x\n", madt->local_apic_addr);
 
-  map_page((uint64_t)madt->local_apic_addr + kernel.hhdm,
-           (uint64_t)madt->local_apic_addr,
-           KERNEL_PFLAG_PRESENT | KERNEL_PFLAG_WRITE, 1);
+  // map_page((uint64_t)madt->local_apic_addr + kernel.hhdm,
+  //          (uint64_t)madt->local_apic_addr,
+  //          KERNEL_PFLAG_PRESENT | KERNEL_PFLAG_WRITE, 1);
 
   kernel.lapic_base = (uint64_t)madt->local_apic_addr + kernel.hhdm;
   init_local_apic(kernel.lapic_base);

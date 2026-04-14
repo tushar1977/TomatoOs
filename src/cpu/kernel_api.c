@@ -12,10 +12,7 @@
 
 // Returns the PHYSICAL address of the RSDP structure via *out_rsdp_address.
 uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
-
-  *out_rsdp_address =
-      (uint64_t)(getPhysicalAddress((void *)kernel.rsdp_address));
-  kprintf("%x", kernel.rsdp_address);
+  *(uint64_t *)out_rsdp_address = kernel.rsdp_address - kernel.hhdm;
   return UACPI_STATUS_OK;
 }
 
@@ -49,22 +46,8 @@ uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
 #define ALIGN_UP(x, align) (((x) + (align) - 1) & ~((align) - 1))
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
 
-  uacpi_phys_addr aligned_addr = ALIGN_DOWN(addr, PAGE_SIZE);
-  uacpi_size offset = addr - aligned_addr;
-  uacpi_size adjusted_len = ALIGN_UP(len + offset, PAGE_SIZE);
-  uacpi_size pages = adjusted_len / PAGE_SIZE;
-
-  uint64_t virt_base = (uint64_t)kernel.hhdm + aligned_addr;
-  uint64_t phys_base = (uint64_t)aligned_addr;
-
-  for (uacpi_size i = 0; i < pages; ++i) {
-    map_page(virt_base + i * PAGE_SIZE, phys_base + i * PAGE_SIZE,
-             KERNEL_PFLAG_PRESENT, PAGE_SIZE);
-  }
-
   return (void *)((uint64_t)kernel.hhdm + addr);
 }
-
 /*
  * Unmap a virtual memory range at 'addr' with a length of 'len' bytes.
  *
@@ -78,19 +61,23 @@ void uacpi_kernel_unmap(void *addr, uacpi_size len) {
 }
 
 #ifndef UACPI_FORMATTED_LOGGING
-void uacpi_kernel_log(uacpi_log_level, const uacpi_char *) {
+void uacpi_kernel_log(uacpi_log_level lvl, const uacpi_char *msg) {
+  const char *lvl_str;
 
-  uacpi_log_level lvl = UACPI_LOG_INFO;
-
-  if (lvl == UACPI_LOG_WARN) {
-    lvl = UACPI_LOG_WARN;
+  switch (lvl) {
+  case UACPI_LOG_WARN:
+    lvl_str = "WARN";
+    break;
+  case UACPI_LOG_ERROR:
+    lvl_str = "ERROR";
+    break;
+  case UACPI_LOG_INFO:
+  default:
+    lvl_str = "INFO";
+    break;
   }
 
-  if (lvl == UACPI_LOG_ERROR) {
-    lvl = UACPI_LOG_ERROR;
-  }
-
-  kprintf("%s", lvl);
+  kprintf("[%s] %s\n", lvl_str, msg);
 }
 #else
 UACPI_PRINTF_DECL(2, 3)
@@ -164,7 +151,11 @@ uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
   *out_handle = (uacpi_handle)pci;
   return UACPI_STATUS_OK;
 }
-void uacpi_kernel_pci_device_close(uacpi_handle addr) { k_free((void *)addr); }
+void uacpi_kernel_pci_device_close(uacpi_handle addr) {
+
+  if (addr)
+    k_free((void *)addr);
+}
 
 /*
  * Read & write the configuration space of a previously open PCI device.
@@ -380,7 +371,11 @@ void *uacpi_kernel_alloc_zeroed(uacpi_size size);
  * calculate the object size.
  */
 #ifndef UACPI_SIZED_FREES
-void uacpi_kernel_free(void *mem) { k_free(mem); }
+void uacpi_kernel_free(void *mem) {
+
+  if (mem)
+    k_free(mem);
+}
 #else
 void uacpi_kernel_free(void *mem, uacpi_size size_hint);
 #endif

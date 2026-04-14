@@ -38,6 +38,8 @@ struct IDTEFrame {
 ;
 
 void disable_interrupts();
+
+void dump_Registers(struct IDTEFrame registers);
 void enable_interrupts();
 
 void disableLegacyPIC();

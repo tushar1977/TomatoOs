@@ -12,3 +12,5 @@ void init_PMM();
 void printMemoryMaps();
 void *k_malloc(size_t size);
 void k_free(void *base);
+uint64_t pmm_alloc_page(void);
+void pmm_free_page(uint64_t phys_addr);

@@ -59,20 +59,16 @@ void dump_Registers(struct IDTEFrame registers) {
 
 void disableLegacyPIC() {
   // Remap PIC
-  outPortB(0x20, 0x11); // ICW1: Initialize PIC1
-  outPortB(0xA0, 0x11); // ICW1: Initialize PIC2
-
-  outPortB(0x21, 0x20); // ICW2: Map PIC1 to vectors 0x20-0x27
-  outPortB(0xA1, 0x28); // ICW2: Map PIC2 to vectors 0x28-0x2F
-
-  outPortB(0x21, 0x02); // ICW3: Tell PIC1 that PIC2 is at IRQ2
-  outPortB(0xA1, 0x04); // ICW3: Tell PIC2 its cascade identity
-
-  outPortB(0x21, 0x01); // ICW4: Set 8086 mode for PIC1
-  outPortB(0xA1, 0x01); // ICW4: Set 8086 mode for PIC2
-
-  outPortB(0x21, 0xFF);
-  outPortB(0xA1, 0xFF);
+  /* ICW1 */
+  outPortB(0x11, 0x20); /* Master port A */
+  outPortB(0x11, 0xA0); /* Slave port A */
+  /* IortBCW2 */
+  outPortB(0x20, 0x21); /* Master offset of 0x20 in the IDT */
+  outPortB(0x28, 0xA1); /* Master offset of 0x28 in the IDT */
+  outPortB(0x04, 0x21); /* Slaves attached to IR line 2 */
+  outPortB(0x02, 0xA1); /* This slave in IR line 2 of master */
+  outPortB(0x05, 0x21); /* Set as master */
+  outPortB(0x01, 0xA1); /* Set as slave */
 }
 void disable_interrupts() { asm("cli"); }
 
