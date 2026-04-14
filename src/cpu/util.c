@@ -58,17 +58,8 @@ void dump_Registers(struct IDTEFrame registers) {
 }
 
 void disableLegacyPIC() {
-  // Remap PIC
-  /* ICW1 */
-  outPortB(0x11, 0x20); /* Master port A */
-  outPortB(0x11, 0xA0); /* Slave port A */
-  /* IortBCW2 */
-  outPortB(0x20, 0x21); /* Master offset of 0x20 in the IDT */
-  outPortB(0x28, 0xA1); /* Master offset of 0x28 in the IDT */
-  outPortB(0x04, 0x21); /* Slaves attached to IR line 2 */
-  outPortB(0x02, 0xA1); /* This slave in IR line 2 of master */
-  outPortB(0x05, 0x21); /* Set as master */
-  outPortB(0x01, 0xA1); /* Set as slave */
+  outPortB(PIC1_DATA, 0xff);
+  outPortB(PIC2_DATA, 0xff);
 }
 void disable_interrupts() { asm("cli"); }
 

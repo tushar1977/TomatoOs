@@ -89,6 +89,7 @@ typedef struct {
 
 void init_apic();
 
+uint32_t read_ioapic(void *ioapic_addr, uint32_t reg);
 void end_of_interrupt();
 
 void set_ioapic_entry(uint8_t vector, uint8_t irq, uint64_t flags,

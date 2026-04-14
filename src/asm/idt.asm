@@ -17,7 +17,6 @@ global alignmentCheckException
 global machineCheckException
 global simdFloatingPointException
 global virtualisationException
-global irq1
 global idt_flush
 idt_flush:
     cli                 ; Disable interrupts
@@ -111,10 +110,6 @@ simdFloatingPointException:
 virtualisationException:
     push 0
     push 20
-    jmp baseHandler
-irq1:
-    push 0
-    push 33
     jmp baseHandler
 
 extern exception_handler

@@ -45,6 +45,4 @@ extern void machineCheckException();
 extern void simdFloatingPointException();
 extern void virtualisationException();
 
-extern void irq1();
-
 #endif

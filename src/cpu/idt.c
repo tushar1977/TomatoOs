@@ -36,7 +36,7 @@ void InitIdt() {
   setIdtGate(IDT, 18, &machineCheckException, 0x08, 0x8E);
   setIdtGate(IDT, 19, &simdFloatingPointException, 0x08, 0x8E);
   setIdtGate(IDT, 20, &virtualisationException, 0x08, 0x8E);
-  setIdtGate(IDT, 33, &keyboardHandler, 0x08, 0x8E);
+  setIdtGate(IDT, 33, &keyboardhandler, 0x08, 0x8E);
 
   kernel.idtr.base = (uint64_t)IDT;
   kernel.idtr.limit = (sizeof(struct InterruptDescriptor64) * 256) - 1;

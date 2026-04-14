@@ -3,7 +3,7 @@
 #define KEYBOARD_H
 #include "idt.h"
 #include "util.h"
-void keyboardHandler(struct IDTEFrame registers);
+__attribute__((interrupt)) void keyboardhandler(struct IDTEFrame *frame);
 void initKeyboard();
 
 void isr_keyboard_handler(struct IDTEFrame *regs);

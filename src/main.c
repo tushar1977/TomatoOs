@@ -36,6 +36,7 @@ void init_kernel() {
       fb_request.response->framebuffer_count < 1) {
     return;
   }
+
   kernel.kernel_addr = *(kernel_address_request.response);
   kernel.kernel_file = *(kernel_file_req.response);
   kernel.kernel_size = (uint64_t)kernel.kernel_file.kernel_file->size;
@@ -63,12 +64,20 @@ void kmain(void) {
   init_kernel();
   init_framebuffer();
   init_PMM();
-
   initPML4();
   initGdt();
   InitIdt();
-  init_apic();
-  acpi_init();
 
-  halt();
+  disableLegacyPIC();
+  init_apic();
+  initKeyboard();
+
+  enable_interrupts();
+
+  k_debug("Kernel ready. Waiting for interrupts...");
+  asm volatile("sti");
+
+  while (1) {
+    asm volatile("hlt");
+  }
 }

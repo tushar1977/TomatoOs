@@ -6,7 +6,9 @@
 #include "../include/printf.h"
 #include "../include/stdio.h"
 #include "../include/string.h"
+#include "apic.h"
 #include "stdint.h"
+#include "util.h"
 #include <stdbool.h>
 
 bool capsOn;
@@ -84,55 +86,63 @@ const uint32_t uppercase[128] = {
     UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN,
     UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN,
     UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN};
-void keyboardHandler(struct IDTEFrame registers) {
-  uint8_t scanCode = inPortB(0x60);
-  bool keyReleased = (scanCode & 0x80) != 0;
-  scanCode &= 0x7F;
-  kprintf("%x\n", scanCode);
+__attribute__((interrupt)) void keyboardhandler(struct IDTEFrame *frame) {
+  char scanCode = inPortB(0x60) & 0x7F;
+  char press = inPortB(0x60) & 0x80;
+  // printf("%d", scanCode);
 
   switch (scanCode) {
-  case 1:  // Escape key
-  case 29: // Ctrl
-  case 56: // Alt
-  case 59: // F1
-  case 60: // F2
-  case 61: // F3
-  case 62: // F4
-  case 63: // F5
-  case 64: // F6
-  case 65: // F7
-  case 66: // F8
-  case 67: // F9
-  case 68: // F10
-  case 87: // F11
-  case 88: // F12
+  case 1:
+  case 29:
+  case 56:
+  case 59:
+  case 60:
+  case 61:
+  case 62:
+  case 63:
+  case 64:
+  case 65:
+  case 66:
+  case 67:
+  case 68:
+  case 87:
+  case 88:
     break;
-  case 42:                 // Shift
-    capsOn = !keyReleased; // True on press, false on release
+  case 42:
+    if (press == 0) {
+      capsOn = true;
+    } else {
+      capsOn = false;
+    }
     break;
-  case 58: // Caps Lock - toggle on press only
-    if (!keyReleased) {
-      capsLock = !capsLock;
+  case 28:
+  case 58:
+    if (!capsLock && press == 0) {
+      capsLock = true;
+    } else if (capsLock && press == 0) {
+      capsLock = false;
     }
     break;
   default:
-    if (!keyReleased) {
+    if (press == 0) {
       if (scanCode >= 0 && scanCode < 128) {
-        char c;
-        if (capsOn || capsLock) {
-          c = uppercase[scanCode];
+        if (capsOn) {
+          kprintf("%c", uppercase[scanCode]);
+        } else if (capsLock) {
+          kprintf("%c", (scanCode >= 'a' && scanCode <= 'z')
+                            ? uppercase[scanCode]
+                            : lowercase[scanCode]);
         } else {
-          c = lowercase[scanCode];
+          kprintf("%c", lowercase[scanCode]);
         }
-
-        kprintf("%c", c);
 
         int i = 0;
         while (text[i] != '\0' && i < sizeof(text) - 1) {
           i++;
         }
         if (i < sizeof(text) - 1) {
-          text[i] = c;
+          text[i] =
+              (capsOn || capsLock) ? uppercase[scanCode] : lowercase[scanCode];
           text[i + 1] = '\0';
         }
       }
@@ -142,7 +152,21 @@ void keyboardHandler(struct IDTEFrame registers) {
   end_of_interrupt();
 }
 void initKeyboard() {
-  capsOn = false;
-  capsLock = false;
-  kprintf("Keyboard interrupt setup complete\n");
+  uint32_t gsi = kernel.irq_overrides[1];
+
+  kprintf("Keyboard: IRQ1 -> GSI %u\n", gsi);
+
+  set_ioapic_entry(0x21, gsi, 0, 0);
+
+  unmask_ioapic(gsi, 0);
+
+  uint32_t reg_low = 0x10 + (gsi * 2);
+  uint32_t low = read_ioapic((void *)kernel.ioapic_addr, reg_low);
+  kprintf("IOAPIC pin %d low dword after setup: %x (should NOT have bit 16 "
+          "set)\n",
+          gsi, low);
+
+  if (low & (1 << 16)) {
+    k_debug("WARNING: Keyboard still masked!");
+  }
 }
