@@ -9,9 +9,9 @@
 #include "include/limine.h"
 #include "include/paging.h"
 #include "include/pmm.h"
-#include "include/printf.h"
 #include "include/util.h"
 #include "limits.h"
+#include "printf.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -59,10 +59,10 @@ void init_kernel() {
       &kernel.bg_colour, &kernel.fg_colour, NULL, &kernel.fg_colour, NULL, 1, 0,
       1, 0, 0, 0);
 }
-
 void kmain(void) {
   init_kernel();
   init_framebuffer();
+
   init_PMM();
   initPML4();
   initGdt();
@@ -74,10 +74,5 @@ void kmain(void) {
 
   enable_interrupts();
 
-  k_debug("Kernel ready. Waiting for interrupts...");
-  asm volatile("sti");
-
-  while (1) {
-    asm volatile("hlt");
-  }
+  halt();
 }

@@ -1,7 +1,6 @@
 #include "../include/apic.h"
 #include "../include/acpi.h"
 #include "../include/flanterm.h"
-#include "../include/flanterm_write.h"
 #include "../include/kernel.h"
 #include "../include/paging.h"
 #include "../include/printf.h"
@@ -77,21 +76,25 @@ void end_of_interrupt() {
 void init_local_apic(uintptr_t lapic_addr) {
 
   write_lapic(lapic_addr, LAPIC_SPURIOUS_INTERRUPT_VECTOR_REGISTER, 0x1FF);
-
   write_lapic(lapic_addr, LAPIC_TASK_PRIORITY_REGISTER, 0x00);
-
   write_lapic(lapic_addr, LAPIC_DESTINATION_FORMAT_REGISTER, 0xFFFFFFFF);
-  uint32_t tpr = read_lapic(lapic_addr, LAPIC_TASK_PRIORITY_REGISTER);
-  kprintf("LAPIC Task Priority Register: %x\n", tpr);
-
-  uint32_t dfr = read_lapic(lapic_addr, LAPIC_DESTINATION_FORMAT_REGISTER);
-  kprintf("LAPIC Destination Format Register: %x\n", dfr);
-
-  uint32_t svr =
-      read_lapic(lapic_addr, LAPIC_SPURIOUS_INTERRUPT_VECTOR_REGISTER);
-  kprintf("LAPIC Spurious Interrupt Vector Register: %x\n", svr);
   k_debug("This LAPIC was successfully set up!");
 }
+
+void *find_MADT(RSDT *root_rsdt) {
+  uint64_t num_entries =
+      (root_rsdt->header.length - sizeof(root_rsdt->header)) / 4;
+  for (size_t i = 0; i < num_entries; i++) {
+    ISDTHeader *this_header =
+        (ISDTHeader *)(root_rsdt->entries[i] + kernel.hhdm);
+
+    if (memcmp(this_header->signature, "APIC", 4) == 0)
+      return (void *)this_header;
+  }
+
+  return NULL;
+}
+
 void init_apic() {
   k_debug("Initiating APIC...");
 
@@ -99,10 +102,8 @@ void init_apic() {
     halt();
   }
 
-  RSDT *rsdt = (RSDT *)(kernel.rsdp_table->rsdt_address + kernel.hhdm);
+  RSDT *rsdt = (RSDT *)(kernel.rsdp_table->rsdt_address);
   kernel.rsdt = rsdt;
-
-  k_debug("RSDT mapped!");
 
   if (!verify_apic()) {
 
@@ -163,4 +164,6 @@ void init_apic() {
 
     offset += entry->record_length;
   }
+
+  k_debug("APIC Done!");
 }

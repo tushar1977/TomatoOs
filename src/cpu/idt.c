@@ -1,12 +1,9 @@
 #include "../include/idt.h"
-#include "../include/fb.h"
 #include "../include/kernel.h"
 #include "../include/keyboard.h"
 #include "../include/paging.h"
 #include "../include/pmm.h"
 #include "../include/printf.h"
-#include "../include/stdio.h"
-#include "../include/string.h"
 #include "../include/util.h"
 #include "stdint.h"
 
@@ -121,6 +118,4 @@ void exception_handler(struct IDTEFrame registers) {
 
   kprintf("%s", label);
   k_fail();
-
-  asm("hlt");
 }

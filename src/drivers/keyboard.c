@@ -153,20 +153,6 @@ __attribute__((interrupt)) void keyboardhandler(struct IDTEFrame *frame) {
 }
 void initKeyboard() {
   uint32_t gsi = kernel.irq_overrides[1];
-
-  kprintf("Keyboard: IRQ1 -> GSI %u\n", gsi);
-
-  set_ioapic_entry(0x21, gsi, 0, 0);
-
+  set_ioapic_entry(0x21, 1, 0, 0);
   unmask_ioapic(gsi, 0);
-
-  uint32_t reg_low = 0x10 + (gsi * 2);
-  uint32_t low = read_ioapic((void *)kernel.ioapic_addr, reg_low);
-  kprintf("IOAPIC pin %d low dword after setup: %x (should NOT have bit 16 "
-          "set)\n",
-          gsi, low);
-
-  if (low & (1 << 16)) {
-    k_debug("WARNING: Keyboard still masked!");
-  }
 }

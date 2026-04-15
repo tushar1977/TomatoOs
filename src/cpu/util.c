@@ -22,14 +22,10 @@ uint16_t pciConfigReadWord(uint8_t bus, uint8_t slot, uint8_t func,
   uint32_t lfunc = (uint32_t)func;
   uint16_t tmp = 0;
 
-  // Create configuration address as per Figure 1
   address = (uint32_t)((lbus << 16) | (lslot << 11) | (lfunc << 8) |
                        (offset & 0xFC) | ((uint32_t)0x80000000));
 
-  // Write out the address
   outPortB(0xCF8, address);
-  // Read in the data
-  // (offset & 2) * 8) = 0 will choose the first word of the 32-bit register
   tmp = (uint16_t)((inPortB(0xCFC) >> ((offset & 2) * 8)) & 0xFFFF);
   return tmp;
 }
@@ -68,7 +64,6 @@ void enable_interrupts() { asm("sti"); }
 void wait_for_interrupt() { asm("hlt"); }
 
 void halt() {
-  disable_interrupts();
   for (;;)
     wait_for_interrupt();
 }

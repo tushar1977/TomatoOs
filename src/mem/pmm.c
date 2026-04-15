@@ -20,7 +20,6 @@ void init_PMM() {
 
   physical.base = largest->base;
   physical.size = largest->length;
-  printMemoryMaps();
 }
 
 void printMemoryMaps() {
