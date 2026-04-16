@@ -5,6 +5,7 @@
 #include "../include/pmm.h"
 #include "../include/printf.h"
 #include "../include/util.h"
+#include "apic_timer.h"
 #include "stdint.h"
 
 __attribute__((interrupt)) void spurious_irq(void *) { end_of_interrupt(); }
@@ -33,6 +34,7 @@ void InitIdt() {
   setIdtGate(IDT, 18, &machineCheckException, 0x08, 0x8E);
   setIdtGate(IDT, 19, &simdFloatingPointException, 0x08, 0x8E);
   setIdtGate(IDT, 20, &virtualisationException, 0x08, 0x8E);
+  setIdtGate(IDT, 32, &apic_timer_handler, 0x08, 0x8E);
   setIdtGate(IDT, 33, &keyboardhandler, 0x08, 0x8E);
 
   kernel.idtr.base = (uint64_t)IDT;

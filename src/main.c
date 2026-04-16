@@ -1,3 +1,4 @@
+#include "apic_timer.h"
 #include "include/acpi.h"
 #include "include/apic.h"
 #include "include/bootinfo.h"
@@ -8,10 +9,10 @@
 #include "include/keyboard.h"
 #include "include/limine.h"
 #include "include/paging.h"
+#include "include/pit.h"
 #include "include/pmm.h"
 #include "include/util.h"
 #include "limits.h"
-#include "printf.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -71,6 +72,7 @@ void kmain(void) {
   disableLegacyPIC();
   init_apic();
   initKeyboard();
+  init_apic_timer();
 
   enable_interrupts();
 

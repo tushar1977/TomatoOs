@@ -33,6 +33,7 @@ typedef struct {
   uint64_t cr3;
   uint32_t irq_overrides[16];
   volatile uint64_t framebuffer_size;
+  volatile uint64_t apic_ticks;
 } Kernel;
 
 extern Kernel kernel;
