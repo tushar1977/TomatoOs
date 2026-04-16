@@ -89,7 +89,7 @@ const uint32_t uppercase[128] = {
 __attribute__((interrupt)) void keyboardhandler(struct IDTEFrame *frame) {
   char scanCode = inPortB(0x60) & 0x7F;
   char press = inPortB(0x60) & 0x80;
-  // printf("%d", scanCode);
+  // kprintf("%x", scanCode);
 
   switch (scanCode) {
   case 1:
@@ -126,24 +126,32 @@ __attribute__((interrupt)) void keyboardhandler(struct IDTEFrame *frame) {
   default:
     if (press == 0) {
       if (scanCode >= 0 && scanCode < 128) {
+        char ch;
         if (capsOn) {
-          kprintf("%c", uppercase[scanCode]);
+          ch = uppercase[scanCode];
         } else if (capsLock) {
-          kprintf("%c", (scanCode >= 'a' && scanCode <= 'z')
-                            ? uppercase[scanCode]
-                            : lowercase[scanCode]);
+          ch = (scanCode >= 'a' && scanCode <= 'z') ? uppercase[scanCode]
+                                                    : lowercase[scanCode];
         } else {
-          kprintf("%c", lowercase[scanCode]);
+          ch = lowercase[scanCode];
         }
-
-        int i = 0;
-        while (text[i] != '\0' && i < sizeof(text) - 1) {
-          i++;
-        }
-        if (i < sizeof(text) - 1) {
-          text[i] =
-              (capsOn || capsLock) ? uppercase[scanCode] : lowercase[scanCode];
-          text[i + 1] = '\0';
+        if (ch == '\b') {
+          int i = 0;
+          while (text[i] != '\0')
+            i++;
+          if (i > 0)
+            text[i - 1] = '\0';
+          kprintf("\b \b");
+        } else {
+          kprintf("%c", ch);
+          int i = 0;
+          while (text[i] != '\0' && i < sizeof(text) - 1) {
+            i++;
+          }
+          if (i < sizeof(text) - 1) {
+            text[i] = ch;
+            text[i + 1] = '\0';
+          }
         }
       }
     }
