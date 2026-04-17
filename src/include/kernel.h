@@ -12,8 +12,8 @@
 typedef struct {
   struct limine_framebuffer **framebuffer;
   struct limine_memmap_response memmap;
-  struct limine_kernel_address_response kernel_addr;
-  struct limine_kernel_file_response kernel_file;
+  struct limine_executable_address_response kernel_addr;
+  struct limine_executable_file_response kernel_file;
   RSDP *rsdp_table;
   RSDT *rsdt;
   struct flanterm_context *ft_ctx;

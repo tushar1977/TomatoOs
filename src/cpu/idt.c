@@ -7,13 +7,10 @@
 #include "../include/util.h"
 #include "apic_timer.h"
 #include "stdint.h"
-
+static struct InterruptDescriptor64 IDT[256] __attribute__((aligned(16)));
 __attribute__((interrupt)) void spurious_irq(void *) { end_of_interrupt(); }
 void InitIdt() {
-  struct InterruptDescriptor64 *IDT =
-      (struct InterruptDescriptor64
-           *)((uint64_t)k_malloc(256 * sizeof(struct InterruptDescriptor64)) +
-              kernel.hhdm);
+  memset(IDT, 0, sizeof(IDT));
 
   setIdtGate(IDT, 0, &divideException, 0x08, 0x8E);
   setIdtGate(IDT, 1, &debugException, 0x08, 0x8E);
@@ -53,6 +50,7 @@ void setIdtGate(struct InterruptDescriptor64 *idt_entries, uint8_t num,
   idt_entries[num].selector = sel;
   idt_entries[num].flags = flags;
   idt_entries[num].ist = 0;
+  // idt_entries[num].reserved = 0;
 }
 void exception_handler(struct IDTEFrame registers) {
   dump_Registers(registers);

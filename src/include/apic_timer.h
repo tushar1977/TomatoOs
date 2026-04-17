@@ -9,6 +9,5 @@
 #define APIC_LVT_TIMER_MODE_PERIODIC (1 << 17)
 #include "idt.h"
 void init_apic_timer();
-void test_apic_timer();
-
+void sleep(uint64_t target_ticks);
 __attribute__((interrupt)) void apic_timer_handler(struct IDTEFrame *frame);

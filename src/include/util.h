@@ -57,3 +57,5 @@ uint16_t pciConfigReadWord(uint8_t bus, uint8_t slot, uint8_t func,
 
 void ConfigWriteDword(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset,
                       uint32_t conf);
+
+__attribute__((interrupt)) void nmi_handler(void *);

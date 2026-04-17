@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+extern void writeCR3(uint64_t cr3);
 #define KERNEL_PFLAG_PRESENT 0b1
 #define KERNEL_PFLAG_WRITE 0b10
 #define KERNEL_PFLAG_USER 0b100
@@ -42,4 +43,6 @@ uint64_t readCR3(void);
 void *getPhysicalAddress(void *virtual_address);
 
 uint64_t virt_to_phys(void *virt);
+void *phys_to_virt(uint64_t phys);
+
 void map_sections();

@@ -11,6 +11,7 @@
 #include "include/paging.h"
 #include "include/pit.h"
 #include "include/pmm.h"
+#include "include/printf.h"
 #include "include/util.h"
 #include "limits.h"
 #include <stdbool.h>
@@ -31,16 +32,18 @@ void init_framebuffer() {
     }
   }
 }
-
 void init_kernel() {
   if (fb_request.response == NULL ||
       fb_request.response->framebuffer_count < 1) {
     return;
   }
+  if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
+    hcf();
+  }
 
   kernel.kernel_addr = *(kernel_address_request.response);
   kernel.kernel_file = *(kernel_file_req.response);
-  kernel.kernel_size = (uint64_t)kernel.kernel_file.kernel_file->size;
+  kernel.kernel_size = (uint64_t)kernel.kernel_file.executable_file->size;
   kernel.rsdp_table = (RSDP *)(rsdp_request.response)->address;
   kernel.rsdp_address = (uint64_t)rsdp_request.response->address;
   kernel.memmap = *memmap_request.response;
@@ -66,15 +69,16 @@ void kmain(void) {
 
   init_PMM();
   initPML4();
+
+  test_pmm();
+
   initGdt();
   InitIdt();
-
   disableLegacyPIC();
   init_apic();
-  initKeyboard();
   init_apic_timer();
+  initKeyboard();
 
   enable_interrupts();
-
   halt();
 }

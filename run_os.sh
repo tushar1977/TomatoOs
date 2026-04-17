@@ -2,11 +2,12 @@
 set -e
 
 if [ ! -d "limine" ]; then
-  git clone https://github.com/limine-bootloader/limine.git --branch=v8.x-binary --depth=1
+  git clone https://github.com/limine-bootloader/limine.git --branch=v11.x-binary --depth=1
 fi
 
-./uACPI.sh
-
+if [ ! -d "src/uacpi" ]; then
+  ./uACPI.sh
+fi
 make clean
 make all
 
@@ -30,8 +31,8 @@ xorriso -as mkisofs -b boot/limine/limine-bios-cd.bin \
 ./limine/limine bios-install myos.iso
 
 if [ "$1" == "debug" ]; then
-  qemu-system-x86_64 myos.iso -s -S
+  qemu-system-x86_64 myos.iso -s -S -m 512M
 else
-  qemu-system-x86_64 myos.iso -s -d int
+  qemu-system-x86_64 myos.iso -s -d int --no-reboot -m 512M
 
 fi

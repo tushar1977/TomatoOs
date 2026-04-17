@@ -12,7 +12,7 @@
 
 // Returns the PHYSICAL address of the RSDP structure via *out_rsdp_address.
 uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
-  *out_rsdp_address = kernel.rsdp_address;
+  *out_rsdp_address = virt_to_phys((void *)kernel.rsdp_address);
   return UACPI_STATUS_OK;
 }
 
@@ -42,11 +42,13 @@ uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
  *              to uACPI.
  */
 #define PAGE_SIZE 4096
-#define ALIGN_DOWN(x, align) ((x) & ~((align) - 1))
-#define ALIGN_UP(x, align) (((x) + (align) - 1) & ~((align) - 1))
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
+  (void)len;
 
-  return (void *)((uint64_t)kernel.hhdm + addr);
+  uint64_t offset = addr & (PAGE_SIZE - 1);
+  uint64_t aligned = addr & ~(PAGE_SIZE - 1);
+
+  return (void *)(kernel.hhdm + aligned + offset);
 }
 /*
  * Unmap a virtual memory range at 'addr' with a length of 'len' bytes.
@@ -145,17 +147,9 @@ void uacpi_kernel_deinitialize(void);
 uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
                                           uacpi_handle *out_handle) {
 
-  uacpi_pci_address *pci =
-      (uacpi_pci_address *)k_malloc(sizeof(uacpi_pci_address));
-  *pci = address;
-  *out_handle = (uacpi_handle)pci;
   return UACPI_STATUS_OK;
 }
-void uacpi_kernel_pci_device_close(uacpi_handle addr) {
-
-  if (addr)
-    k_free((void *)addr);
-}
+void uacpi_kernel_pci_device_close(uacpi_handle addr) {}
 
 /*
  * Read & write the configuration space of a previously open PCI device.
@@ -350,7 +344,7 @@ uacpi_status uacpi_kernel_io_write32(uacpi_handle handle, uacpi_size offset,
  * Allocate a block of memory of 'size' bytes.
  * The contents of the allocated memory are unspecified.
  */
-void *uacpi_kernel_alloc(uacpi_size size) { return (void *)k_malloc(size); }
+void *uacpi_kernel_alloc(uacpi_size size) {}
 
 #ifdef UACPI_NATIVE_ALLOC_ZEROED
 /*
@@ -371,11 +365,7 @@ void *uacpi_kernel_alloc_zeroed(uacpi_size size);
  * calculate the object size.
  */
 #ifndef UACPI_SIZED_FREES
-void uacpi_kernel_free(void *mem) {
-
-  if (mem)
-    k_free(mem);
-}
+void uacpi_kernel_free(void *mem) {}
 #else
 void uacpi_kernel_free(void *mem, uacpi_size size_hint);
 #endif

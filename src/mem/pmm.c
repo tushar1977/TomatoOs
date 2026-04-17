@@ -5,7 +5,26 @@
 #include "../include/limine.h"
 #include "../include/printf.h"
 #include "../include/string.h"
-physical_allocator physical;
+
+available_memory physical;
+static uint8_t *bitmap = NULL;
+static uint64_t total_pages = 0;
+static uint64_t bitmap_size = 0;
+static uint64_t usable_base = 0;
+
+void test_pmm() {
+  uint64_t p1 = pmm_alloc_page(1);
+  kprintf("P1 addr = %x\n", p1);
+
+  uint64_t p2 = pmm_alloc_page(100);
+  kprintf("P1 addr = %x\n", p2);
+
+  pmm_free(p1, 1);
+
+  uint64_t p3 = pmm_alloc_page(100);
+  kprintf("P1 addr = %x\n", p3);
+}
+
 void init_PMM() {
   k_debug("Initialising Physical Memory Allocator...");
   struct limine_memmap_entry *largest = NULL;
@@ -17,9 +36,27 @@ void init_PMM() {
       }
     }
   }
-
   physical.base = largest->base;
   physical.size = largest->length;
+  kprintf("%x\n", physical.base);
+  kprintf("%d\n", physical.size);
+
+  total_pages = physical.size / BLOCK_SIZE;
+
+  bitmap = (uint8_t *)(physical.base + kernel.hhdm);
+  bitmap_size = (total_pages + 7) / 8;
+
+  memset(bitmap, 0, sizeof(bitmap_size));
+
+  uint64_t bitmap_pages = (bitmap_size + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  for (uint64_t i = 0; i < bitmap_pages; i++)
+    BITMAP_SET(bitmap, i);
+
+  usable_base = physical.base + (bitmap_pages * BLOCK_SIZE);
+  printMemoryMaps();
+
+  kprintf("PMM: %d pages available (%d MB)\n", total_pages - bitmap_pages,
+          (total_pages - bitmap_pages) * BLOCK_SIZE / (1024 * 1024));
 }
 
 void printMemoryMaps() {
@@ -31,27 +68,35 @@ void printMemoryMaps() {
 
     const char *type_str;
     switch (entry->type) {
-    case 1:
+    case LIMINE_MEMMAP_USABLE:
       type_str = "Available";
       break;
-    case 2:
+    case LIMINE_MEMMAP_RESERVED:
       type_str = "Reserved";
       break;
-    case 3:
+    case LIMINE_MEMMAP_ACPI_RECLAIMABLE:
       type_str = "ACPI Recl";
       break;
-    case 4:
+    case LIMINE_MEMMAP_ACPI_NVS:
       type_str = "ACPI NVS";
       break;
-    case 5:
+    case LIMINE_MEMMAP_BAD_MEMORY:
       type_str = "Bad Mem";
+      break;
+    case LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE:
+      type_str = "Boot Recl";
+      break;
+    case LIMINE_MEMMAP_EXECUTABLE_AND_MODULES:
+      type_str = "Kernel";
+      break;
+    case LIMINE_MEMMAP_FRAMEBUFFER:
+      type_str = "Framebuffer";
       break;
     default:
       type_str = "Unknown";
       break;
     }
-
-    kprintf("| %x | 0x%x | %dMB | %s |\n", i, (unsigned int)(entry->base),
+    kprintf("| %x | %x | %dMB | %s |\n", i, (entry->base),
             (int)(entry->length / (1024 * 1024)), type_str);
   }
 
@@ -68,59 +113,34 @@ void printMemoryMaps() {
   kprintf("Total available memory: %d MB (%d KB)\n",
           total_available / (1024 * 1024), total_available / 1024);
 }
-static void *b_malloc(uint64_t *base, size_t length, size_t size) {
-  if (length <= BLOCK_SIZE) {
-    if (size + 1 <= length && *((uint64_t *)base) == 0) {
-      *base = size;
-      memset(base + 1, 0, sizeof(void *) * size);
-      return (void *)(base + 1);
-    } else {
-      return NULL;
-    }
-  }
+uint64_t pmm_alloc_page(uint64_t size) {
+  uint64_t page_needed = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  for (uint64_t i = 0; i < total_pages; i++) {
+    if (BITMAP_TEST(bitmap, i))
+      continue;
+    uint64_t j;
+    for (j = i; j < i + page_needed && j < total_pages; j++) {
 
-  size_t half = length / 2;
-  if (half <= size + 1 && *((uint64_t *)base) == 0) {
-    *base = size;
-    memset(base + 1, 0, sizeof(void *) * size);
-    return (void *)(base + 1);
-  } else if (half > size) {
-    void *b = b_malloc(base, half, size);
-    if (b == NULL) {
-      b = b_malloc(base + half, half, size);
+      if (BITMAP_TEST(bitmap, j))
+        break;
     }
 
-    return b;
+    if (j == i + page_needed) {
+      for (uint64_t k = i; k < j; k++) {
+        BITMAP_SET(bitmap, k);
+      }
+      return physical.base + (i * BLOCK_SIZE);
+    }
+    i = j;
   }
-  return NULL;
+  kprintf("PMM: out of memory!\n");
+  return 0;
 }
 
-void *k_malloc(size_t size) {
-  return b_malloc((uint64_t *)physical.base, physical.size, size);
-}
-
-void k_free(void *base) {
-
-  if (base == NULL)
+void pmm_free(uint64_t addr, size_t pages) {
+  if (addr == 0)
     return;
-  uint64_t *header = ((uint64_t *)base) - 1;
-  uint64_t size = *header;
-
-  memset(header, 0, sizeof(uint64_t) + sizeof(void *) * size);
-}
-uint64_t pmm_alloc_page(void) {
-  void *page = k_malloc(4096);
-  if (page == NULL) {
-    return 0;
-  }
-
-  uint64_t virt_addr = (uint64_t)page;
-  uint64_t phys_addr = virt_addr - kernel.hhdm;
-
-  return phys_addr;
-}
-
-void pmm_free_page(uint64_t phys_addr) {
-  void *virt_addr = (void *)(phys_addr + kernel.hhdm);
-  k_free(virt_addr);
+  uint64_t idx = (addr - physical.base) / BLOCK_SIZE;
+  for (uint64_t i = idx; i < idx + pages; i++)
+    BITMAP_CLEAR(bitmap, i);
 }

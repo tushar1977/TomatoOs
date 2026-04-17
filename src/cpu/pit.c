@@ -14,7 +14,15 @@ unsigned read_pit_count(void) {
   return count;
 }
 
-void test() {
+void set_pit_count(unsigned count) {
+  // Disable interrupts
+  outPortB(0x43, 0x30);
+  // Set low byte
+  outPortB(0x40, count & 0xFF);          // Low byte
+  outPortB(0x40, (count & 0xFF00) >> 8); // High byte
+  return;
+}
+void wait_for_pit() {
   disable_interrupts();
   set_pit_count(11931);
 
@@ -25,17 +33,8 @@ void test() {
       last = val;
     }
     if (val == 0) {
-
       break;
     }
   }
-  return;
-}
-void set_pit_count(unsigned count) {
-  // Disable interrupts
-  outPortB(0x43, 0x30);
-  // Set low byte
-  outPortB(0x40, count & 0xFF);          // Low byte
-  outPortB(0x40, (count & 0xFF00) >> 8); // High byte
   return;
 }

@@ -98,12 +98,7 @@ void *find_MADT(RSDT *root_rsdt) {
 void init_apic() {
   k_debug("Initiating APIC...");
 
-  if (kernel.rsdp_table->revision != 0) {
-    halt();
-  }
-
-  RSDT *rsdt = (RSDT *)(kernel.rsdp_table->rsdt_address);
-  kernel.rsdt = rsdt;
+  kernel.rsdt = (RSDT *)(kernel.rsdp_table->rsdt_address + kernel.hhdm);
 
   if (!verify_apic()) {
 
@@ -116,6 +111,9 @@ void init_apic() {
   kprintf("Local APIC paddr: %x\n", madt->local_apic_addr);
 
   kernel.lapic_base = (uint64_t)madt->local_apic_addr + kernel.hhdm;
+
+  map_page(kernel.lapic_base, (uint64_t)madt->local_apic_addr,
+           KERNEL_PFLAG_PRESENT | KERNEL_PFLAG_WRITE, 1);
   init_local_apic(kernel.lapic_base);
 
   uint64_t offset = sizeof(MADT);
@@ -139,6 +137,10 @@ void init_apic() {
 
       kernel.ioapic_device = *ioapic;
       kernel.ioapic_addr = ioapic->ioapic_addr;
+
+      uint64_t ioapic_virt = (uint64_t)ioapic->ioapic_addr + kernel.hhdm;
+      map_page(ioapic_virt, (uint64_t)ioapic->ioapic_addr,
+               KERNEL_PFLAG_PRESENT | KERNEL_PFLAG_WRITE, 1);
 
       break;
     }

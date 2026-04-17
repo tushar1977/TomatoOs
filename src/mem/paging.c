@@ -15,15 +15,17 @@ extern uint64_t p_kernel_end[];
 static inline void flushTLB(void *page) {
   __asm__ volatile("invlpg (%0)" ::"r"(page) : "memory");
 }
-static inline void *phys_to_virt(uint64_t phys) {
-  return (void *)(phys + kernel.hhdm);
-}
-
+void *phys_to_virt(uint64_t phys) { return (void *)(phys + kernel.hhdm); }
 uint64_t virt_to_phys(void *virt) {
   uint64_t addr = (uint64_t)virt;
 
-  if (addr >= &kernel.hhdm) {
+  if (addr >= kernel.hhdm) {
     return addr - kernel.hhdm;
+  }
+
+  if (addr >= kernel.kernel_addr.virtual_base) {
+    return addr -
+           (kernel.kernel_addr.virtual_base - kernel.kernel_addr.physical_base);
   }
 
   return (uint64_t)getPhysicalAddress(virt);
@@ -35,38 +37,58 @@ uint64_t readCR3(void) {
 }
 
 void map_kernel() {
-  uint64_t p_kernel = kernel.kernel_addr.physical_base;
-  uint64_t v_kernel = kernel.kernel_addr.virtual_base;
+  uint64_t phys_base = kernel.kernel_addr.physical_base;
+  uint64_t virt_base = kernel.kernel_addr.virtual_base;
+  uint64_t offset = virt_base - phys_base;
 
-  uint64_t phys_kernel_start = (uint64_t)p_kernel_start - (v_kernel - p_kernel);
-  uint64_t phys_writeallowed_start =
-      (uint64_t)p_writeallowed_start - (v_kernel - p_kernel);
-  uint64_t phys_kernel_end = (uint64_t)p_kernel_end - (v_kernel - p_kernel);
+  uint64_t virt_ro_start = (uint64_t)p_kernel_start;
+  uint64_t virt_rw_start = (uint64_t)p_writeallowed_start;
+  uint64_t virt_end = (uint64_t)p_kernel_end;
 
-  uint64_t readonly_size =
-      (uint64_t)p_writeallowed_start - (uint64_t)p_kernel_start;
-  uint64_t writable_size =
-      (uint64_t)p_kernel_end - (uint64_t)p_writeallowed_start;
+  uint64_t phys_ro_start = virt_ro_start - offset;
+  uint64_t phys_rw_start = virt_rw_start - offset;
 
-  size_t readonly_pages = (readonly_size + 4095) / 4096;
-  size_t writable_pages = (writable_size + 4095) / 4096;
+  size_t readonly_pages =
+      (virt_rw_start - virt_ro_start + PAGE_SIZE - 1) / PAGE_SIZE;
+  size_t writable_pages =
+      (virt_end - virt_rw_start + PAGE_SIZE - 1) / PAGE_SIZE;
 
-  map_page(phys_kernel_start + kernel.hhdm, phys_kernel_start,
-           KERNEL_PFLAG_PRESENT, readonly_pages);
+  map_page(virt_ro_start, phys_ro_start, KERNEL_PFLAG_PRESENT, readonly_pages);
 
-  map_page(phys_writeallowed_start + kernel.hhdm, phys_writeallowed_start,
+  map_page(virt_rw_start, phys_rw_start,
            KERNEL_PFLAG_PRESENT | KERNEL_PFLAG_WRITE, writable_pages);
 }
-PageTable *initPML4() {
 
-  k_debug("Initialising Page Tables...");
-  uint64_t cr3 = readCR3() & ~0xFFF;
-  PML4 = phys_to_virt(cr3);
-  k_debug("Mapping kernel...");
+void map_all_mem() {
+  for (size_t i = 0; i < kernel.memmap.entry_count; i++) {
+
+    struct limine_memmap_entry *entry = kernel.memmap.entries[i];
+    if (entry->type == LIMINE_MEMMAP_RESERVED ||
+        entry->type == LIMINE_MEMMAP_BAD_MEMORY)
+      continue;
+
+    uint64_t phys = entry->base;
+    uint64_t virt = phys + kernel.hhdm;
+    size_t pages = (entry->length + PAGE_SIZE - 1) / PAGE_SIZE;
+
+    uint64_t flags = KERNEL_PFLAG_PRESENT | KERNEL_PFLAG_WRITE;
+
+    map_page(virt, phys, flags, pages);
+  }
   map_kernel();
+}
+PageTable *initPML4() {
+  k_debug("Initialising Page Tables...");
 
-  k_debug("Mapping usable mem...");
-  kernel.cr3 = (uint64_t)PML4 - kernel.hhdm;
+  uint64_t pml4_phys = pmm_alloc_page(1);
+  PML4 = phys_to_virt(pml4_phys);
+  memset(PML4, 0, PAGE_SIZE);
+
+  map_all_mem();
+
+  kernel.cr3 = pml4_phys;
+  writeCR3(pml4_phys);
+
   return PML4;
 }
 void setPageTableEntry(PageEntry *entry, uint8_t flags,
@@ -121,15 +143,19 @@ void *getPhysicalAddress(void *virtual_address) {
                   offset);
 }
 
-static void allocateEntry(PageTable *table, size_t index, uint8_t flags) {
-  uint64_t phys = pmm_alloc_page();
+static uint64_t allocateEntry(PageTable *table, size_t index, uint8_t flags) {
+
+  uint64_t phys = pmm_alloc_page(1);
   if (phys == 0) {
-    return;
+    kprintf("VMM: failed to allocate page table at index %d\n", index);
+    return 0;
   }
   PageTable *pt = phys_to_virt(phys);
+
   memset(pt, 0, 4096);
   setPageTableEntry(&table->entries[index], flags | PTE_PRESENT | PTE_WRITABLE,
                     phys, 0);
+  return phys;
 }
 void map_page(uint64_t virt, uint64_t phys, uint64_t flags, size_t num_pages) {
   for (size_t i = 0; i < num_pages; i++) {
