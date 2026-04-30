@@ -2,18 +2,6 @@
 #include "../include/printf.h"
 #include <stdint.h>
 
-void outPortB(uint16_t port, uint8_t value) {
-
-  asm volatile("outb %1 ,%0" : : "dN"(port), "a"(value));
-}
-
-char inPortB(uint16_t port) {
-
-  char rv;
-  asm volatile("inb %1, %0" : "=a"(rv) : "dN"(port));
-  return rv;
-}
-
 uint16_t pciConfigReadWord(uint8_t bus, uint8_t slot, uint8_t func,
                            uint8_t offset) {
   uint32_t address;

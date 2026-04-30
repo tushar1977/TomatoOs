@@ -10,10 +10,35 @@
 #define PCI_CONFIG_ADDRESS 0xCF8
 #define PCI_CONFIG_DATA 0xCFC
 #define CEIL_DIV(a, b) (((a + b) - 1) / b)
+static inline void outPortB(uint16_t port, uint8_t value) {
+  asm volatile("outb %0, %1" : : "a"(value), "Nd"(port));
+}
 
-void outPortB(uint16_t port, uint8_t value);
+static inline void outPortW(uint16_t port, uint16_t value) {
+  asm volatile("outw %0, %1" : : "a"(value), "Nd"(port));
+}
 
-char inPortB(uint16_t port);
+static inline void outPortD(uint16_t port, uint32_t value) {
+  asm volatile("outl %0, %1" : : "a"(value), "Nd"(port));
+}
+
+static inline uint8_t inPortB(uint16_t port) {
+  uint8_t value;
+  asm volatile("inb %1, %0" : "=a"(value) : "Nd"(port));
+  return value;
+}
+
+static inline uint16_t inPortW(uint16_t port) {
+  uint16_t value;
+  asm volatile("inw %1, %0" : "=a"(value) : "Nd"(port));
+  return value;
+}
+
+static inline uint32_t inPortD(uint16_t port) {
+  uint32_t value;
+  asm volatile("inl %1, %0" : "=a"(value) : "Nd"(port));
+  return value;
+}
 
 struct IDTEFrame {
   uint64_t cr2;

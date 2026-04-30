@@ -1,6 +1,7 @@
 
 #include "uacpi/kernel_api.h"
 #include "kernel.h"
+#include "kmem.h"
 #include "paging.h"
 #include "pmm.h"
 #include "printf.h"
@@ -287,10 +288,10 @@ uacpi_status uacpi_kernel_io_read(uacpi_handle handle, uacpi_size offset,
     *out = inPortB(target);
     break;
   case 2:
-    *out = inPortB(target);
+    *out = inPortW(target);
     break;
   case 4:
-    *out = inPortB(target);
+    *out = inPortD(target);
     break;
   default:
     return UACPI_STATUS_INVALID_ARGUMENT;
@@ -318,10 +319,10 @@ uacpi_status uacpi_kernel_io_write(uacpi_handle handle, uacpi_size offset,
     outPortB(target, value);
     break;
   case 2:
-    outPortB(target, value);
+    outPortW(target, value);
     break;
   case 4:
-    outPortB(target, value);
+    outPortD(target, value);
     break;
   default:
     return UACPI_STATUS_INVALID_ARGUMENT;
@@ -344,7 +345,7 @@ uacpi_status uacpi_kernel_io_write32(uacpi_handle handle, uacpi_size offset,
  * Allocate a block of memory of 'size' bytes.
  * The contents of the allocated memory are unspecified.
  */
-void *uacpi_kernel_alloc(uacpi_size size) {}
+void *uacpi_kernel_alloc(uacpi_size size) { return kmalloc(size); }
 
 #ifdef UACPI_NATIVE_ALLOC_ZEROED
 /*
@@ -365,12 +366,13 @@ void *uacpi_kernel_alloc_zeroed(uacpi_size size);
  * calculate the object size.
  */
 #ifndef UACPI_SIZED_FREES
-void uacpi_kernel_free(void *mem) {}
+void uacpi_kernel_free(void *mem) { kfree(mem); }
 #else
 void uacpi_kernel_free(void *mem, uacpi_size size_hint);
 #endif
 uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void) {
-  return 0; // returning 0 instead of NULL for u64
+  static uacpi_u64 counter = 0;
+  return counter += 1000000;
 }
 
 /*
