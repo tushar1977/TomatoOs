@@ -7,6 +7,7 @@
 #include "../include/stdio.h"
 #include "../include/string.h"
 #include "apic.h"
+#include "kmem.h"
 #include "stdint.h"
 #include "util.h"
 #include <stdbool.h>
@@ -86,6 +87,16 @@ const uint32_t uppercase[128] = {
     UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN,
     UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN,
     UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN};
+char *slice(const char *str, size_t start, size_t end) {
+  size_t len = end - start;
+  char *result = (char *)kmalloc(len + 1);
+  if (!result) {
+    return NULL;
+  }
+  memcpy(result, str + start, len);
+  result[len] = '\0';
+  return result;
+}
 __attribute__((interrupt)) void keyboardhandler(struct IDTEFrame *frame) {
   char scanCode = inPortB(0x60) & 0x7F;
   char press = inPortB(0x60) & 0x80;
@@ -116,6 +127,20 @@ __attribute__((interrupt)) void keyboardhandler(struct IDTEFrame *frame) {
     }
     break;
   case 28:
+    if (press == 0) {
+      kprintf("\n");
+
+      if (strcmp("clear", text) == 0) {
+        clear();
+      } else if (scanCode != 28) {
+        kprintf("Unknown command: %s\n", text);
+      }
+      memset(text, 0, sizeof(text));
+
+      kprintf("tusos-->");
+    }
+    break;
+
   case 58:
     if (!capsLock && press == 0) {
       capsLock = true;

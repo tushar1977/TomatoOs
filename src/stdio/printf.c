@@ -5,6 +5,12 @@
 #include "limits.h"
 #include <stdarg.h>
 Spinlock lock;
+
+void clear() {
+  const char *seq = "\x1b[2J\x1b[H";
+  flanterm_write(kernel.ft_ctx, seq, strlen(seq));
+}
+
 int kprintf(const char *restrict format, ...) {
   va_list parameters;
   va_start(parameters, format);

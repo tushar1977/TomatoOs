@@ -10,13 +10,14 @@
 #include "include/paging.h"
 #include "include/pmm.h"
 #include "include/util.h"
+#include "kmem.h"
 #include "limits.h"
+#include "printf.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 Kernel kernel = {0};
-
 void init_framebuffer() {
   uint32_t *fb_addr = (uint32_t *)kernel.framebuffer[0]->address;
   uint64_t width = kernel.framebuffer[0]->width;
@@ -72,6 +73,7 @@ void kmain(void) {
   initGdt();
   InitIdt();
   disableLegacyPIC();
+
   init_apic();
   init_apic_timer();
   initKeyboard();
