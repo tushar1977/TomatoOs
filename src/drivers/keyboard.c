@@ -130,6 +130,7 @@ __attribute__((interrupt)) void keyboardhandler(struct IDTEFrame *frame) {
     if (press == 0) {
       kprintf("\n");
 
+      // Local commands
       if (strcmp("clear", text) == 0) {
         clear();
       } else if (scanCode != 28) {

@@ -78,6 +78,8 @@ void kmain(void) {
   init_apic_timer();
   initKeyboard();
 
+  kmem_init();
+
   enable_interrupts();
   halt();
 }

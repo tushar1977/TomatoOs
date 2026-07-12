@@ -1,6 +1,4 @@
 #include "../include/spinlock.h"
-#include <stdatomic.h>
-#include <stdint.h>
 
 void spinlock_aquire(Spinlock *lock) {
   while (atomic_flag_test_and_set(&lock->flag)) {

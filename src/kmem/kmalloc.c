@@ -1,6 +1,7 @@
 #include "include/kmem.h"
 #include <stddef.h>
 #include <stdio.h>
+
 char *brk = NULL;
 char *endp = NULL;
 void *base = NULL;
@@ -13,22 +14,28 @@ meta_ptr find_block(meta_ptr *last, size_t size) {
     b = b->next;
   }
 
-  return *last;
+  return b;
 }
+
+void kmem_init(void) {
+  brk = heap;
+  endp = heap + HEAP_SIZE;
+  base = NULL;
+}
+
 void *sbrk(size_t size) {
-  if (size == 0) {
+  if (size == 0)
     return (void *)brk;
-  }
 
-  void *free = (void *)brk;
+  if (brk + size > endp)
+    return (void *)-1;
 
+  void *old = (void *)brk;
   brk += size;
-  if (brk >= endp) {
-    return NULL;
-  }
 
-  return free;
-};
+  return old;
+}
+
 void split(meta_ptr block, size_t size) {
   meta_ptr newblock;
   newblock = (struct meta_block *)(block->data + size);
@@ -38,6 +45,7 @@ void split(meta_ptr block, size_t size) {
   newblock->ptr = newblock->data;
   newblock->prev = block;
   block->next = newblock;
+  block->size = size;
   if (newblock->next) {
     newblock->next->prev = newblock;
   }
@@ -70,7 +78,7 @@ void *kmalloc(size_t size) {
 
   if (base) {
     last = base;
-    block = find_block(&last, size);
+    block = find_block(&last, s);
     if (block) {
       if (block->size - s >= (META_BLOCK_SIZE + 4)) {
         split(block, s);

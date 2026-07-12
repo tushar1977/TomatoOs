@@ -1,8 +1,10 @@
 #pragma once
 #include <stddef.h>
-
+#define HEAP_SIZE (64 * 1024)
+static char heap[HEAP_SIZE];
 #define align4(x) (((((x) - 1) >> 2) << 2) + 4)
 #define META_BLOCK_SIZE 20
+
 typedef struct meta_block *meta_ptr;
 struct meta_block {
   int free;
@@ -16,6 +18,9 @@ extern char *brk;
 extern char *endp;
 extern void *base;
 
+void *krealloc(void *ptr, size_t size);
+void split(meta_ptr block, size_t size);
+void kmem_init(void);
 void *kmalloc(size_t size);
 void kfree(void *ptr);
 void *sbrk(size_t size);
