@@ -12,7 +12,8 @@
 #include "include/util.h"
 #include "kmem.h"
 #include "limits.h"
-#include "printf.h"
+#include "vfs.h"
+// #include "printf.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -79,6 +80,9 @@ void kmain(void) {
   initKeyboard();
 
   kmem_init();
+  init_vfs();
+
+  // just a simple test file created by ai
 
   enable_interrupts();
   halt();

@@ -62,7 +62,7 @@ void init_vfs() {
     return;
   }
 
-  memcpy(vfs->root->name, "root", strlen("root"));
+  memcpy(vfs->root->name, "root", strlen("root") + 1);
   vfs->root->file_count = 0;
   vfs->root->capacity = INITIAL_CAPACITY;
   vfs->total_files = 0;
@@ -151,7 +151,19 @@ const char *read_file(const char *name) {
   for (int i = 0; i < vfs->root->file_count; i++) {
     if (strcmp(vfs->root->files[i].name, name) == 0) {
       uint32_t inode_number = vfs->root->files[i].inode_number;
-      uint32_t block_number = vfs->inode_table[inode_number]->blocks[0];
+
+      struct myfs_inode *inode = vfs->inode_table[inode_number];
+
+      if (inode->mode == 0755) {
+        return NULL;
+      }
+
+      uint32_t block_number = inode->blocks[0];
+
+      if (block_number == (uint32_t)-1) {
+        return NULL;
+      }
+
       return vfs->data_blocks[block_number].data;
     }
   }
@@ -289,4 +301,303 @@ void display_content(const char *name) {
     }
   }
   kprintf("\n");
+}
+
+void test_vfs() {
+  kprintf("\n");
+  kprintf("========================================\n");
+  kprintf("          VFS TEST SUITE\n");
+  kprintf("========================================\n");
+
+  /* --------------------------------------------------
+   * Test 1: VFS initialization
+   * -------------------------------------------------- */
+  kprintf("\n[TEST 1] VFS initialization\n");
+
+  if (vfs == NULL) {
+    kprintf("FAIL: vfs is NULL\n");
+    return;
+  }
+
+  if (vfs->root == NULL) {
+    kprintf("FAIL: root directory is NULL\n");
+    return;
+  }
+
+  if (vfs->superblock == NULL) {
+    kprintf("FAIL: superblock is NULL\n");
+    return;
+  }
+
+  if (vfs->root->file_count != 0) {
+    kprintf("FAIL: root should initially be empty\n");
+    return;
+  }
+
+  if (vfs->total_files != 0) {
+    kprintf("FAIL: total_files should be 0\n");
+    return;
+  }
+
+  if (vfs->total_size != 0) {
+    kprintf("FAIL: total_size should be 0\n");
+    return;
+  }
+
+  kprintf("PASS: VFS initialized correctly\n");
+
+  /* --------------------------------------------------
+   * Test 2: Create a file
+   * -------------------------------------------------- */
+  kprintf("\n[TEST 2] Create file\n");
+
+  const char *file1_data = "Hello, VFS!";
+
+  int result = create_file("hello.txt", file1_data, VREG);
+
+  if (result != VFS_SUCCESS) {
+    kprintf("FAIL: create_file() returned %d\n", result);
+    return;
+  }
+
+  if (vfs->root->file_count != 1) {
+    kprintf("FAIL: file_count should be 1\n");
+    return;
+  }
+
+  if (vfs->total_files != 1) {
+    kprintf("FAIL: total_files should be 1\n");
+    return;
+  }
+
+  if (vfs->total_size != strlen(file1_data)) {
+    kprintf("FAIL: total_size is incorrect\n");
+    return;
+  }
+
+  kprintf("PASS: file created successfully\n");
+
+  /* --------------------------------------------------
+   * Test 3: Read the file
+   * -------------------------------------------------- */
+  kprintf("\n[TEST 3] Read file\n");
+
+  const char *content = read_file("hello.txt");
+
+  if (content == NULL) {
+    kprintf("FAIL: read_file() returned NULL\n");
+    return;
+  }
+
+  if (strcmp(content, file1_data) != 0) {
+    kprintf("FAIL: file content mismatch\n");
+    kprintf("Expected: %s\n", file1_data);
+    kprintf("Got: %s\n", content);
+    return;
+  }
+
+  kprintf("PASS: file content is correct\n");
+
+  /* --------------------------------------------------
+   * Test 4: Read non-existent file
+   * -------------------------------------------------- */
+  kprintf("\n[TEST 4] Read non-existent file\n");
+
+  content = read_file("does_not_exist.txt");
+
+  if (content != NULL) {
+    kprintf("FAIL: non-existent file should return NULL\n");
+    return;
+  }
+
+  kprintf("PASS: non-existent file handled correctly\n");
+
+  /* --------------------------------------------------
+   * Test 5: Create second file
+   * -------------------------------------------------- */
+  kprintf("\n[TEST 5] Create second file\n");
+
+  const char *file2_data = "This is another file.";
+
+  result = create_file("test.txt", file2_data, VREG);
+
+  if (result != VFS_SUCCESS) {
+    kprintf("FAIL: second file creation failed\n");
+    return;
+  }
+
+  if (vfs->root->file_count != 2) {
+    kprintf("FAIL: file_count should be 2\n");
+    return;
+  }
+
+  if (vfs->total_files != 2) {
+    kprintf("FAIL: total_files should be 2\n");
+    return;
+  }
+
+  kprintf("PASS: second file created successfully\n");
+
+  /* --------------------------------------------------
+   * Test 6: Read second file
+   * -------------------------------------------------- */
+  kprintf("\n[TEST 6] Read second file\n");
+
+  content = read_file("test.txt");
+
+  if (content == NULL) {
+    kprintf("FAIL: second file could not be read\n");
+    return;
+  }
+
+  if (strcmp(content, file2_data) != 0) {
+    kprintf("FAIL: second file content mismatch\n");
+    return;
+  }
+
+  kprintf("PASS: second file content is correct\n");
+
+  /* --------------------------------------------------
+   * Test 7: Display all files
+   * -------------------------------------------------- */
+  kprintf("\n[TEST 7] Display all files\n");
+
+  display_all_files();
+
+  kprintf("PASS: display_all_files() executed\n");
+
+  /* --------------------------------------------------
+   * Test 8: Display file content
+   * -------------------------------------------------- */
+  kprintf("\n[TEST 8] Display file content\n");
+
+  display_content("hello.txt");
+
+  kprintf("PASS: display_content() executed\n");
+
+  /* --------------------------------------------------
+   * Test 9: Create directory
+   * -------------------------------------------------- */
+  kprintf("\n[TEST 9] Create directory\n");
+
+  result = create_directory("mydir");
+
+  if (result != VFS_SUCCESS) {
+    kprintf("FAIL: create_directory() failed\n");
+    return;
+  }
+
+  if (vfs->root->file_count != 3) {
+    kprintf("FAIL: directory was not added to root\n");
+    return;
+  }
+
+  if (vfs->total_files != 3) {
+    kprintf("FAIL: total_files should be 3\n");
+    return;
+  }
+
+  kprintf("PASS: directory created successfully\n");
+
+  /* --------------------------------------------------
+   * Test 10: Check directory inode
+   * -------------------------------------------------- */
+  kprintf("\n[TEST 10] Check directory inode\n");
+
+  int dir_inode = -1;
+
+  for (int i = 0; i < vfs->root->file_count; i++) {
+    if (strcmp(vfs->root->files[i].name, "mydir") == 0) {
+      dir_inode = vfs->root->files[i].inode_number;
+      break;
+    }
+  }
+
+  if (dir_inode == -1) {
+    kprintf("FAIL: directory inode not found\n");
+    return;
+  }
+
+  if (vfs->inode_table[dir_inode]->mode != 0755) {
+    kprintf("FAIL: directory mode is incorrect\n");
+    return;
+  }
+
+  kprintf("PASS: directory inode is correct\n");
+
+  /* --------------------------------------------------
+   * Test 11: Delete a file
+   * -------------------------------------------------- */
+  kprintf("\n[TEST 11] Delete hello.txt\n");
+
+  result = delete_file("hello.txt");
+
+  if (result != VFS_SUCCESS) {
+    kprintf("FAIL: delete_file() failed\n");
+    return;
+  }
+
+  if (read_file("hello.txt") != NULL) {
+    kprintf("FAIL: deleted file can still be read\n");
+    return;
+  }
+
+  if (vfs->root->file_count != 2) {
+    kprintf("FAIL: file_count should be 2 after deletion\n");
+    return;
+  }
+
+  if (vfs->total_files != 2) {
+    kprintf("FAIL: total_files should be 2 after deletion\n");
+    return;
+  }
+
+  kprintf("PASS: file deleted successfully\n");
+
+  /* --------------------------------------------------
+   * Test 12: Delete non-existent file
+   * -------------------------------------------------- */
+  kprintf("\n[TEST 12] Delete non-existent file\n");
+
+  result = delete_file("does_not_exist.txt");
+
+  if (result != VFS_ERROR) {
+    kprintf("FAIL: deleting non-existent file should fail\n");
+    return;
+  }
+
+  kprintf("PASS: non-existent deletion handled correctly\n");
+
+  /* --------------------------------------------------
+   * Test 13: Verify remaining files
+   * -------------------------------------------------- */
+  kprintf("\n[TEST 13] Verify remaining files\n");
+
+  if (read_file("test.txt") == NULL) {
+    kprintf("FAIL: test.txt disappeared unexpectedly\n");
+    return;
+  }
+
+  if (read_file("mydir") != NULL) {
+    kprintf("FAIL: directory should not be treated as a regular file\n");
+    return;
+  }
+
+  kprintf("PASS: remaining filesystem entries are correct\n");
+
+  /* --------------------------------------------------
+   * Final state
+   * -------------------------------------------------- */
+  kprintf("\n========================================\n");
+  kprintf("          VFS TEST COMPLETE\n");
+  kprintf("========================================\n");
+
+  kprintf("Total files : %d\n", vfs->total_files);
+  kprintf("Total size  : %d\n", vfs->total_size);
+  kprintf("Free blocks : %d\n", vfs->superblock->free_blocks);
+  kprintf("Free inodes : %d\n", vfs->superblock->inode_count);
+
+  display_all_files();
+
+  kprintf("========================================\n");
 }

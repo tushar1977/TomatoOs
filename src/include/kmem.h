@@ -1,9 +1,9 @@
 #pragma once
 #include <stddef.h>
-#define HEAP_SIZE (64 * 1024)
-static char heap[HEAP_SIZE];
+#define HEAP_SIZE (1024 * 1024)
+extern char heap[HEAP_SIZE];
 #define align4(x) (((((x) - 1) >> 2) << 2) + 4)
-#define META_BLOCK_SIZE 20
+#define META_BLOCK_SIZE offsetof(struct meta_block, data)
 
 typedef struct meta_block *meta_ptr;
 struct meta_block {

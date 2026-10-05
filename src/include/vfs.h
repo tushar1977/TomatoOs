@@ -73,7 +73,7 @@ extern VFS *vfs;
  * Allocates memory for the VFS, root directory, superblock, and inode table.
  */
 void init_vfs();
-
+void test_vfs();
 /**
  * Cleans up and deallocates memory used by the VFS.
  */

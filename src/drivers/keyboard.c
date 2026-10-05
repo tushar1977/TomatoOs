@@ -10,6 +10,7 @@
 #include "kmem.h"
 #include "stdint.h"
 #include "util.h"
+#include "vfs.h"
 #include <stdbool.h>
 
 bool capsOn;
@@ -133,6 +134,9 @@ __attribute__((interrupt)) void keyboardhandler(struct IDTEFrame *frame) {
       // Local commands
       if (strcmp("clear", text) == 0) {
         clear();
+      }
+      if (strcmp("ls", text) == 0) {
+        display_all_files();
       } else if (scanCode != 28) {
         kprintf("Unknown command: %s\n", text);
       }

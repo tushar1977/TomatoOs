@@ -1,7 +1,7 @@
 #include "include/kmem.h"
 #include <stddef.h>
 #include <stdio.h>
-
+char heap[HEAP_SIZE];
 char *brk = NULL;
 char *endp = NULL;
 void *base = NULL;
@@ -9,7 +9,7 @@ void *base = NULL;
 meta_ptr find_block(meta_ptr *last, size_t size) {
   meta_ptr b = base;
 
-  while (b && (b->free && b->size >= size)) {
+  while (b && (!b->free || b->size < size)) {
     *last = b;
     b = b->next;
   }

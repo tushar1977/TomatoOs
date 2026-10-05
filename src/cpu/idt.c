@@ -36,7 +36,9 @@ void InitIdt() {
 
   kernel.idtr.base = (uint64_t)IDT;
   kernel.idtr.limit = (sizeof(struct InterruptDescriptor64) * 256) - 1;
-
+  kprintf("[IDT] IDT array address: %x\n", (uint64_t)IDT);
+  kprintf("[IDT] idtr.base: %x\n", kernel.idtr.base);
+  kprintf("[IDT] idtr.limit: %x\n", kernel.idtr.limit);
   asm volatile("lidt %0" ::"m"(kernel.idtr));
 
   k_debug("Initialising IDT...");
