@@ -58,40 +58,42 @@ void reg(void (*pcidrv)(pci_t, uint8_t, uint8_t, uint8_t), uint8_t _class,
          uint8_t subclass);
 void initworkspace();
 
-inline uint32_t pci_read_config32(uint8_t bus, uint8_t num, uint8_t function,
-                                  uint8_t offset) {
+static inline uint32_t pci_read_config32(uint8_t bus, uint8_t num,
+                                         uint8_t function, uint8_t offset) {
   uint32_t address = (1u << 31) | (bus << 16) | (num << 11) | (function << 8) |
                      (offset & 0xfc);
   outPortD(PCI_CONFIG_ADDRESS, address);
   return inPortD(PCI_CONFIG_DATA);
 }
 
-inline uint16_t pci_read_config16(uint8_t bus, uint8_t num, uint8_t function,
-                                  uint8_t offset) {
+static inline uint16_t pci_read_config16(uint8_t bus, uint8_t num,
+                                         uint8_t function, uint8_t offset) {
   uint32_t address = (1u << 31) | (bus << 16) | (num << 11) | (function << 8) |
                      (offset & 0xfc);
   outPortD(PCI_CONFIG_ADDRESS, address);
   return (uint16_t)((inPortD(PCI_CONFIG_DATA) >> ((offset & 2) * 8)) & 0xffff);
 }
 
-inline uint8_t pci_read_config8(uint8_t bus, uint8_t num, uint8_t function,
-                                uint8_t offset) {
+static inline uint8_t pci_read_config8(uint8_t bus, uint8_t num,
+                                       uint8_t function, uint8_t offset) {
   uint32_t address = (1u << 31) | (bus << 16) | (num << 11) | (function << 8) |
                      (offset & 0xfc);
   outPortD(PCI_CONFIG_ADDRESS, address);
   return (uint8_t)((inPortD(PCI_CONFIG_DATA) >> ((offset & 3) * 8)) & 0xff);
 }
 
-inline void pci_write_config32(uint8_t bus, uint8_t num, uint8_t function,
-                               uint8_t offset, uint32_t value) {
+static inline void pci_write_config32(uint8_t bus, uint8_t num,
+                                      uint8_t function, uint8_t offset,
+                                      uint32_t value) {
   uint32_t address = (1u << 31) | (bus << 16) | (num << 11) | (function << 8) |
                      (offset & 0xfc);
   outPortD(PCI_CONFIG_ADDRESS, address);
   outPortD(PCI_CONFIG_DATA, value);
 }
 
-inline void pci_write_config16(uint8_t bus, uint8_t num, uint8_t function,
-                               uint8_t offset, uint16_t value) {
+static inline void pci_write_config16(uint8_t bus, uint8_t num,
+                                      uint8_t function, uint8_t offset,
+                                      uint16_t value) {
   uint32_t address = (1u << 31) | (bus << 16) | (num << 11) | (function << 8) |
                      (offset & 0xfc);
   outPortD(PCI_CONFIG_ADDRESS, address);
@@ -102,8 +104,8 @@ inline void pci_write_config16(uint8_t bus, uint8_t num, uint8_t function,
   outPortD(PCI_CONFIG_DATA, merged);
 }
 
-inline void pci_write_config8(uint8_t bus, uint8_t num, uint8_t function,
-                              uint8_t offset, uint8_t value) {
+static inline void pci_write_config8(uint8_t bus, uint8_t num, uint8_t function,
+                                     uint8_t offset, uint8_t value) {
   uint32_t address = (1u << 31) | (bus << 16) | (num << 11) | (function << 8) |
                      (offset & 0xfc);
   outPortD(PCI_CONFIG_ADDRESS, address);

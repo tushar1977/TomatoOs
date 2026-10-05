@@ -1,6 +1,6 @@
 #pragma once
 #include <stddef.h>
-#define HEAP_SIZE (1024 * 1024)
+#define HEAP_SIZE (16 * 1024 * 1024)
 extern char heap[HEAP_SIZE];
 #define align4(x) (((((x) - 1) >> 2) << 2) + 4)
 #define META_BLOCK_SIZE offsetof(struct meta_block, data)

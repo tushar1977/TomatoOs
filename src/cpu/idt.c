@@ -7,7 +7,7 @@
 #include "../include/util.h"
 #include "apic_timer.h"
 #include "stdint.h"
-static struct InterruptDescriptor64 IDT[256] __attribute__((aligned(16)));
+struct InterruptDescriptor64 IDT[256] __attribute__((aligned(16)));
 __attribute__((interrupt)) void spurious_irq(void *) { end_of_interrupt(); }
 void InitIdt() {
   memset(IDT, 0, sizeof(IDT));
@@ -120,4 +120,5 @@ void exception_handler(struct IDTEFrame registers) {
 
   kprintf("%s", label);
   k_fail();
+  halt();
 }

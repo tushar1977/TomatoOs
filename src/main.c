@@ -4,6 +4,7 @@
 #include "include/bootinfo.h"
 #include "include/gdt.h"
 #include "include/idt.h"
+#include "include/irq.h"
 #include "include/kernel.h"
 #include "include/keyboard.h"
 #include "include/limine.h"
@@ -12,6 +13,7 @@
 #include "include/util.h"
 #include "kmem.h"
 #include "limits.h"
+#include "pci.h"
 #include "vfs.h"
 // #include "printf.h"
 #include <stdbool.h>
@@ -75,15 +77,18 @@ void kmain(void) {
   InitIdt();
   disableLegacyPIC();
 
+  kmem_init();
   init_apic();
   init_apic_timer();
+  acpi_init();
+  init_irq_subsystem();
   initKeyboard();
 
-  kmem_init();
   init_vfs();
 
   // just a simple test file created by ai
 
+  initworkspace();
   enable_interrupts();
   halt();
 }

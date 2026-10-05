@@ -4,7 +4,6 @@
 
 #include "stdint.h"
 #include "util.h"
-
 struct InterruptDescriptor64 {
   uint16_t address_low;
   uint16_t selector;
@@ -24,6 +23,8 @@ struct Idt_ptr {
 void InitIdt();
 void setIdtGate(struct InterruptDescriptor64 *idt_entries, uint8_t num,
                 void *base, uint16_t sel, uint8_t flags);
+
+extern struct InterruptDescriptor64 IDT[256];
 
 extern void divideException();
 extern void debugException();

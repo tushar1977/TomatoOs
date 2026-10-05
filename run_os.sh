@@ -31,8 +31,8 @@ xorriso -as mkisofs -b boot/limine/limine-bios-cd.bin \
 ./limine/limine bios-install myos.iso
 
 if [ "$1" == "debug" ]; then
-  qemu-system-x86_64 myos.iso -s -S -m 1024M -smp 2
+  qemu-system-x86_64 myos.iso -s -S -d int,cpu_reset -no-reboot -m 1G -smp 4,sockets=1,cores=4,threads=1 -mem-prealloc -device ahci,id=ahci0
 else
-  qemu-system-x86_64 myos.iso -s -d int --no-reboot -m 1G -smp 4,sockets=1,cores=4,threads=1 -mem-prealloc
+  qemu-system-x86_64 myos.iso -s -d int --no-reboot -m 1G -smp 4,sockets=1,cores=4,threads=1 -mem-prealloc -device ahci,id=ahci0
 
 fi
