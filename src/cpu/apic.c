@@ -145,8 +145,6 @@ void init_apic() {
 
   k_debug("[APIC] MADT found");
 
-  /* signature is a 4-byte, non-null-terminated field; copy it into a
-   * null-terminated buffer so we can print it with %s */
   char madt_sig[5];
   madt_sig[0] = madt->header.signature[0];
   madt_sig[1] = madt->header.signature[1];
