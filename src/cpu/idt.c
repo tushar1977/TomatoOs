@@ -1,6 +1,7 @@
 #include "../include/idt.h"
 #include "../include/kernel.h"
 #include "../include/keyboard.h"
+#include "../include/klog.h"
 #include "../include/paging.h"
 #include "../include/pmm.h"
 #include "../include/printf.h"
@@ -36,9 +37,10 @@ void InitIdt() {
 
   kernel.idtr.base = (uint64_t)IDT;
   kernel.idtr.limit = (sizeof(struct InterruptDescriptor64) * 256) - 1;
-  kprintf("[IDT] IDT array address: %x\n", (uint64_t)IDT);
-  kprintf("[IDT] idtr.base: %x\n", kernel.idtr.base);
-  kprintf("[IDT] idtr.limit: %x\n", kernel.idtr.limit);
+
+  klog(KLOG_DEBUG, "IDT");
+  kprintf("array=%x base=%x limit=%x\n", (uint64_t)IDT, kernel.idtr.base,
+          kernel.idtr.limit);
   asm volatile("lidt %0" ::"m"(kernel.idtr));
 
   k_debug("Initialising IDT...");
@@ -118,7 +120,7 @@ void exception_handler(struct IDTEFrame registers) {
     break;
   }
 
-  kprintf("%s", label);
-  k_fail();
+  klog(KLOG_ERROR, "TRAP");
+  kprintf("%s\n", label);
   halt();
 }

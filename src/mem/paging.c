@@ -1,5 +1,6 @@
 #include "../include/paging.h"
 #include "../include/kernel.h"
+#include "../include/klog.h"
 #include "../include/limine.h"
 #include "../include/pmm.h"
 #include "../include/printf.h"
@@ -147,7 +148,8 @@ static uint64_t allocateEntry(PageTable *table, size_t index, uint8_t flags) {
 
   uint64_t phys = pmm_alloc_page(1);
   if (phys == 0) {
-    kprintf("VMM: failed to allocate page table at index %d\n", index);
+    klog(KLOG_ERROR, "VMM");
+    kprintf("failed to allocate page table at index %d\n", index);
     return 0;
   }
   PageTable *pt = phys_to_virt(phys);

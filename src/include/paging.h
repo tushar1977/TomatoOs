@@ -12,6 +12,7 @@ extern void writeCR3(uint64_t cr3);
 #define PTE_NO_EXECUTE (1ULL << 63)
 #define PTE_WRITABLE (1 << 1)
 #define PTE_USER (1 << 2)
+#define PTE_NOCACHE (1 << 4)
 #define PTE_HUGE (1 << 7)
 #define PTE_GLOBAL (1 << 8)
 #define PTE_NX (1ULL << 63)

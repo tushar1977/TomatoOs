@@ -1,6 +1,8 @@
 #include "uacpi/kernel_api.h"
+#include "apic_timer.h"
 #include "irq.h"
 #include "kernel.h"
+#include "klog.h"
 #include "kmem.h"
 #include "paging.h"
 #include "pci.h"
@@ -13,37 +15,11 @@
 #include <uacpi/platform/arch_helpers.h>
 #include <uacpi/types.h>
 
-// Returns the PHYSICAL address of the RSDP structure via *out_rsdp_address.
 uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
   *out_rsdp_address = virt_to_phys((void *)kernel.rsdp_address);
   return UACPI_STATUS_OK;
 }
 
-/*
- * Map a physical memory range starting at 'addr' with length 'len', and return
- * a virtual address that can be used to access it.
- *
- * NOTE: 'addr' may be misaligned, in this case the host is expected to round it
- *       down to the nearest page-aligned boundary and map that, while making
- *       sure that at least 'len' bytes are still mapped starting at 'addr'. The
- *       return value preserves the misaligned offset.
- *
- *       Example for uacpi_kernel_map(0x1ABC, 0xF00):
- *           1. Round down the 'addr' we got to the nearest page boundary.
- *              Considering a PAGE_SIZE of 4096 (or 0x1000), 0x1ABC rounded down
- *              is 0x1000, offset within the page is 0x1ABC - 0x1000 => 0xABC
- *           2. Requested 'len' is 0xF00 bytes, but we just rounded the address
- *              down by 0xABC bytes, so add those on top. 0xF00 + 0xABC =>
- * 0x19BC
- *           3. Round up the final 'len' to the nearest PAGE_SIZE boundary, in
- *              this case 0x19BC is 0x2000 bytes (2 pages if PAGE_SIZE is 4096)
- *           4. Call the VMM to map the aligned address 0x1000 (from step 1)
- *              with length 0x2000 (from step 3). Let's assume the returned
- *              virtual address for the mapping is 0xF000.
- *           5. Add the original offset within page 0xABC (from step 1) to the
- *              resulting virtual address 0xF000 + 0xABC => 0xFABC. Return it
- *              to uACPI.
- */
 #define PAGE_SIZE 4096
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
   uint64_t offset = addr & (PAGE_SIZE - 1);
@@ -58,36 +34,29 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
 
   return (void *)(virt + offset);
 }
-/*
- * Unmap a virtual memory range at 'addr' with a length of 'len' bytes.
- *
- * NOTE: 'addr' may be misaligned, see the comment above 'uacpi_kernel_map'.
- *       Similar steps to uacpi_kernel_map can be taken to retrieve the
- *       virtual address originally returned by the VMM for this mapping
- *       as well as its true length.
- */
 void uacpi_kernel_unmap(void *addr, uacpi_size len) {
-  // hhdm doesnt need unmap
+  // TODO:
 }
 
 #ifndef UACPI_FORMATTED_LOGGING
 void uacpi_kernel_log(uacpi_log_level lvl, const uacpi_char *msg) {
-  const char *lvl_str;
+  klog_level_t level;
 
   switch (lvl) {
   case UACPI_LOG_WARN:
-    lvl_str = "WARN";
+    level = KLOG_WARN;
     break;
   case UACPI_LOG_ERROR:
-    lvl_str = "ERROR";
+    level = KLOG_ERROR;
     break;
   case UACPI_LOG_INFO:
   default:
-    lvl_str = "INFO";
+    level = KLOG_INFO;
     break;
   }
 
-  kprintf("[%s] %s\n", lvl_str, msg);
+  klog(level, "uACPI");
+  kprintf("%s\n", msg);
 }
 #else
 UACPI_PRINTF_DECL(2, 3)
@@ -164,14 +133,12 @@ uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
 }
 void uacpi_kernel_pci_device_close(uacpi_handle addr) { kfree(addr); }
 
-/*
- * Read & write the configuration space of a previously open PCI device.
- */
 uacpi_status uacpi_kernel_pci_read(uacpi_handle handle, uacpi_size offset,
                                    uacpi_u8 width, uacpi_u64 *out) {
   uacpi_pci_address *address = (uacpi_pci_address *)handle;
   if (address->segment != 0) {
-    kprintf("[acpi::glue] (read) Bad PCI segment{%d}!\n", address->segment);
+    klog(KLOG_WARN, "PCI");
+    kprintf("unsupported PCI segment %d (read)\n", address->segment);
   }
 
   switch (width) {
@@ -212,7 +179,8 @@ uacpi_status uacpi_kernel_pci_write(uacpi_handle handle, uacpi_size offset,
                                     uacpi_u8 width, uacpi_u64 value) {
   uacpi_pci_address *address = (uacpi_pci_address *)handle;
   if (address->segment != 0) {
-    kprintf("[acpi::glue] (write) Bad PCI segment{%d}!\n", address->segment);
+    klog(KLOG_WARN, "PCI");
+    kprintf("unsupported PCI segment %d (write)\n", address->segment);
   }
 
   switch (width) {
@@ -374,17 +342,18 @@ void uacpi_kernel_free(void *mem, uacpi_size size_hint);
 uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void) {
   return kernel.apic_ticks * 10000000ULL;
 }
+void uacpi_kernel_stall(uacpi_u8 usec) {
+  uint32_t count =
+      (uint32_t)(((uint64_t)kernel.lapic_ticks_per_10ms * usec) / 10000ULL);
+  lapic_busy_wait_ticks(count);
+}
 
-/*
- * Spin for N microseconds.
- */
-void uacpi_kernel_stall(uacpi_u8 usec) { (void)usec; }
-
-/*
- * Sleep for N milliseconds.
- */
-void uacpi_kernel_sleep(uacpi_u64 msec) { (void)msec; }
-
+void uacpi_kernel_sleep(uacpi_u64 msec) {
+  uint32_t ticks_per_ms = kernel.lapic_ticks_per_10ms / 10;
+  for (uacpi_u64 i = 0; i < msec; i++) {
+    lapic_busy_wait_ticks(ticks_per_ms);
+  }
+}
 /*
  * Create/free an opaque non-recursive kernel mutex object.
  */
@@ -460,7 +429,10 @@ uacpi_interrupt_ret uacpi_kernel_disable_interrupts(void) {
  * Restore the state of the interrupt flags to the kernel-defined value provided
  * in 'state'.
  */
-void uacpi_kernel_restore_interrupts(uacpi_interrupt_ret state) { (void)state; }
+void uacpi_kernel_restore_interrupts(uacpi_interrupt_ret state) {
+  (void)state;
+  enable_interrupts();
+}
 
 uacpi_status uacpi_kernel_uninstall_interrupt_handler(uacpi_interrupt_handler,
                                                       uacpi_handle irq_handle) {

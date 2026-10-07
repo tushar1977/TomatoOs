@@ -95,6 +95,7 @@ void end_of_interrupt();
 void set_ioapic_entry(uint8_t vector, uint8_t irq, uint64_t flags,
                       uint64_t lapic);
 void unmask_ioapic(uint32_t gsi, uint32_t lapic_id);
+void mask_ioapic(uint32_t gsi, uint32_t lapic_id);
 
 void write_lapic(uintptr_t lapic_addr, uint64_t reg_offset, uint32_t val);
 uint32_t read_lapic(uintptr_t lapic_base, uint32_t reg);

@@ -8,6 +8,7 @@
 #include "../include/string.h"
 #include "apic.h"
 #include "kmem.h"
+#include "power.h"
 #include "stdint.h"
 #include "util.h"
 #include "vfs.h"
@@ -134,6 +135,12 @@ __attribute__((interrupt)) void keyboardhandler(struct IDTEFrame *frame) {
       // Local commands
       if (strcmp("clear", text) == 0) {
         clear();
+      }
+      if (strcmp("reboot", text) == 0) {
+        reboot();
+      }
+      if (strcmp("shutdown", text) == 0) {
+        shutdown();
       }
       if (strcmp("ls", text) == 0) {
         display_all_files();

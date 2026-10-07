@@ -1,4 +1,5 @@
 #include "include/vfs.h"
+#include "include/klog.h"
 #include "include/kmem.h"
 #include "include/printf.h"
 #include "include/string.h"
@@ -13,14 +14,16 @@ VFS *vfs = NULL;
 void init_vfs() {
   vfs = (VFS *)kmalloc(sizeof(VFS));
   if (!vfs) {
-    kprintf("Failed to allocate memory for VFS.\n");
+    klog(KLOG_ERROR, "VFS");
+    kprintf("failed to allocate memory for VFS\n");
     return;
   }
 
   vfs->superblock =
       (struct myfs_superblock *)kmalloc(sizeof(struct myfs_superblock));
   if (!vfs->superblock) {
-    kprintf("Failed to allocate memory for superblock.\n");
+    klog(KLOG_ERROR, "VFS");
+    kprintf("failed to allocate memory for superblock\n");
     kfree(vfs);
     return;
   }
@@ -29,7 +32,8 @@ void init_vfs() {
     vfs->inode_table[i] =
         (struct myfs_inode *)kmalloc(sizeof(struct myfs_inode));
     if (!vfs->inode_table[i]) {
-      kprintf("Failed to allocate memory for inode table.\n");
+      klog(KLOG_ERROR, "VFS");
+      kprintf("failed to allocate memory for inode table\n");
       for (int j = 0; j < i; j++) {
         kfree(vfs->inode_table[j]);
       }
@@ -41,7 +45,8 @@ void init_vfs() {
 
   vfs->root = (Directory *)kmalloc(sizeof(Directory));
   if (!vfs->root) {
-    kprintf("Failed to allocate memory for root directory.\n");
+    klog(KLOG_ERROR, "VFS");
+    kprintf("failed to allocate memory for root directory\n");
     for (int i = 0; i < MAX_FILES; i++) {
       kfree(vfs->inode_table[i]);
     }
@@ -52,7 +57,8 @@ void init_vfs() {
 
   vfs->root->files = (File *)kmalloc(INITIAL_CAPACITY * sizeof(File));
   if (!vfs->root->files) {
-    kprintf("Failed to allocate memory for root files.\n");
+    klog(KLOG_ERROR, "VFS");
+    kprintf("failed to allocate memory for root files\n");
     kfree(vfs->root);
     for (int i = 0; i < MAX_FILES; i++) {
       kfree(vfs->inode_table[i]);
@@ -85,7 +91,8 @@ void init_vfs() {
     memset(vfs->data_blocks[i].data, 0, BLOCK_SIZE);
   }
 
-  kprintf("VFS initialized successfully.\n");
+  klog(KLOG_INFO, "VFS");
+  kprintf("initialized successfully\n");
 }
 int create_file(const char *name, const char *data, enum vtype VTYPE) {
 

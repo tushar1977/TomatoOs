@@ -2,6 +2,7 @@
 #include "../include/fb.h"
 #include "../include/flanterm.h"
 #include "../include/kernel.h"
+#include "../include/klog.h"
 #include "../include/limine.h"
 #include "../include/printf.h"
 #include "../include/string.h"
@@ -14,15 +15,9 @@ static uint64_t usable_base = 0;
 
 void test_pmm() {
   uint64_t p1 = pmm_alloc_page(1);
-  kprintf("P1 addr = %x\n", p1);
-
-  uint64_t p2 = pmm_alloc_page(100);
-  kprintf("P1 addr = %x\n", p2);
-
+  pmm_alloc_page(100);
   pmm_free(p1, 1);
-
-  uint64_t p3 = pmm_alloc_page(100);
-  kprintf("P1 addr = %x\n", p3);
+  pmm_alloc_page(100);
 }
 
 void init_PMM() {
@@ -38,8 +33,6 @@ void init_PMM() {
   }
   physical.base = largest->base;
   physical.size = largest->length;
-  kprintf("%x\n", physical.base);
-  kprintf("%d\n", physical.size);
 
   total_pages = physical.size / BLOCK_SIZE;
 
@@ -55,12 +48,14 @@ void init_PMM() {
   usable_base = physical.base + (bitmap_pages * BLOCK_SIZE);
   printMemoryMaps();
 
-  kprintf("PMM: %d pages available (%d MB)\n", total_pages - bitmap_pages,
+  klog(KLOG_INFO, "PMM");
+  kprintf("%d pages available (%d MB)\n", total_pages - bitmap_pages,
           (total_pages - bitmap_pages) * BLOCK_SIZE / (1024 * 1024));
 }
 
 void printMemoryMaps() {
-  kprintf("Memory Map:\n");
+  klog(KLOG_INFO, "PMM");
+  kprintf("memory map (%d entries):\n", kernel.memmap.entry_count);
   kprintf("--------------------------------------------------\n");
 
   for (size_t i = 0; i < kernel.memmap.entry_count; i++) {
@@ -101,7 +96,6 @@ void printMemoryMaps() {
   }
 
   kprintf("--------------------------------------------------\n");
-  kprintf("Total entries: %d\n", kernel.memmap.entry_count);
 
   uint64_t total_available = 0;
   for (size_t i = 0; i < kernel.memmap.entry_count; i++) {
@@ -110,7 +104,8 @@ void printMemoryMaps() {
     }
   }
 
-  kprintf("Total available memory: %d MB (%d KB)\n",
+  klog(KLOG_INFO, "PMM");
+  kprintf("%d MB (%d KB) total available memory\n",
           total_available / (1024 * 1024), total_available / 1024);
 }
 uint64_t pmm_alloc_page(uint64_t size) {
@@ -133,7 +128,8 @@ uint64_t pmm_alloc_page(uint64_t size) {
     }
     i = j;
   }
-  kprintf("PMM: out of memory!\n");
+  klog(KLOG_ERROR, "PMM");
+  kprintf("out of memory!\n");
   return 0;
 }
 

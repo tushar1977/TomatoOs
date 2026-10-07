@@ -8,6 +8,8 @@
 #define APIC_LVT_INT_MASKED (1 << 16)
 #define APIC_LVT_TIMER_MODE_PERIODIC (1 << 17)
 #include "idt.h"
+
+void lapic_busy_wait_ticks(uint32_t count);
 void init_apic_timer();
 void sleep(uint64_t target_ticks);
 __attribute__((interrupt)) void apic_timer_handler(struct IDTEFrame *frame);

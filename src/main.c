@@ -7,15 +7,17 @@
 #include "include/irq.h"
 #include "include/kernel.h"
 #include "include/keyboard.h"
+#include "include/klog.h"
 #include "include/limine.h"
+#include "include/nvme.h"
 #include "include/paging.h"
 #include "include/pmm.h"
 #include "include/util.h"
 #include "kmem.h"
 #include "limits.h"
 #include "pci.h"
+#include "printf.h"
 #include "vfs.h"
-// #include "printf.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -68,6 +70,9 @@ void kmain(void) {
   init_kernel();
   init_framebuffer();
 
+  klog(KLOG_INFO, "KERNEL");
+  kprintf("TushOs booting...\n");
+
   init_PMM();
   initPML4();
 
@@ -80,15 +85,21 @@ void kmain(void) {
   kmem_init();
   init_apic();
   init_apic_timer();
-  acpi_init();
+
+  enable_interrupts();
+
   init_irq_subsystem();
   initKeyboard();
 
   init_vfs();
 
-  // just a simple test file created by ai
-
+  acpi_init();
+  // reg(nvme_dump_info, 0x01, 0x08);
+  reg(nvme_init, 0x01, 0x08);
   initworkspace();
-  enable_interrupts();
+
+  klog(KLOG_INFO, "KERNEL");
+  kprintf("boot complete\n");
+
   halt();
 }

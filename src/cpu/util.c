@@ -1,4 +1,5 @@
 #include "../include/util.h"
+#include "../include/klog.h"
 #include "../include/printf.h"
 #include <stdint.h>
 
@@ -57,7 +58,8 @@ void halt() {
 }
 
 __attribute__((interrupt)) void nmi_handler(void *) {
-  kprintf("NMI received\n");
+  klog(KLOG_ERROR, "NMI");
+  kprintf("non-maskable interrupt received\n");
   halt();
 }
 

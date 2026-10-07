@@ -75,6 +75,8 @@ void enable_interrupts();
 void disableLegacyPIC();
 void wait_for_interrupt();
 void halt();
+static inline void pause(void) { asm volatile("pause"); }
+static inline void memory_barrier(void) { asm volatile("mfence" ::: "memory"); }
 void cpuid(int code, uint32_t *a, uint32_t *d);
 
 uint16_t pciConfigReadWord(uint8_t bus, uint8_t slot, uint8_t func,

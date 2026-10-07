@@ -2,6 +2,7 @@
 #include "../include/acpi.h"
 #include "../include/flanterm.h"
 #include "../include/kernel.h"
+#include "../include/klog.h"
 #include "../include/paging.h"
 #include "../include/printf.h"
 #include "../include/string.h"
@@ -78,7 +79,9 @@ void init_local_apic(uintptr_t lapic_addr) {
   write_lapic(lapic_addr, LAPIC_SPURIOUS_INTERRUPT_VECTOR_REGISTER, 0x1FF);
   write_lapic(lapic_addr, LAPIC_TASK_PRIORITY_REGISTER, 0x00);
   write_lapic(lapic_addr, LAPIC_DESTINATION_FORMAT_REGISTER, 0xFFFFFFFF);
-  k_debug("This LAPIC was successfully set up!");
+
+  klog(KLOG_INFO, "APIC");
+  kprintf("Local APIC configured at %x\n", lapic_addr);
 }
 
 void *find_MADT(RSDT *root_rsdt) {
@@ -96,148 +99,68 @@ void *find_MADT(RSDT *root_rsdt) {
 }
 
 void init_apic() {
-  k_debug("[APIC] === BEGIN init_apic ===");
-
-  k_debug("[APIC] Checking RSDP...");
-  kprintf("[APIC] RSDP address: %x\n", kernel.rsdp_table);
-
   if (!kernel.rsdp_table) {
-    k_debug("[APIC] ERROR: kernel.rsdp_table is NULL");
+    klog(KLOG_ERROR, "APIC");
+    kprintf("RSDP table is NULL\n");
     halt();
   }
-
-  k_debug("[APIC] RSDP looks non-null");
-
-  k_debug("[APIC] Calculating RSDT address...");
-  kprintf("[APIC] RSDT physical: %x\n", kernel.rsdp_table->rsdt_address);
-  kprintf("[APIC] HHDM: %x\n", kernel.hhdm);
 
   kernel.rsdt = (RSDT *)(kernel.rsdp_table->rsdt_address + kernel.hhdm);
 
-  kprintf("[APIC] RSDT virtual: %x\n", kernel.rsdt);
-
   if (!kernel.rsdt) {
-    k_debug("[APIC] ERROR: RSDT is NULL");
+    klog(KLOG_ERROR, "APIC");
+    kprintf("RSDT is NULL\n");
     halt();
   }
 
-  k_debug("[APIC] Calling verify_apic()...");
-
-  bool apic_supported = verify_apic();
-
-  kprintf("[APIC] verify_apic() returned: %d\n", apic_supported);
-
-  if (!apic_supported) {
-    k_debug("[APIC] ERROR: APIC not supported");
+  if (!verify_apic()) {
+    klog(KLOG_ERROR, "APIC");
+    kprintf("APIC not supported by this CPU\n");
     halt();
   }
-
-  k_debug("[APIC] Calling find_MADT()...");
 
   MADT *madt = (MADT *)find_MADT(kernel.rsdt);
-
-  kprintf("[APIC] find_MADT returned: %x\n", madt);
-
   if (!madt) {
-    k_debug("[APIC] ERROR: MADT not found");
+    klog(KLOG_ERROR, "APIC");
+    kprintf("MADT not found\n");
     halt();
   }
 
-  k_debug("[APIC] MADT found");
-
-  char madt_sig[5];
-  madt_sig[0] = madt->header.signature[0];
-  madt_sig[1] = madt->header.signature[1];
-  madt_sig[2] = madt->header.signature[2];
-  madt_sig[3] = madt->header.signature[3];
-  madt_sig[4] = '\0';
-
-  kprintf("[APIC] MADT signature: %s\n", madt_sig);
-  kprintf("[APIC] MADT length: %d\n", madt->header.length);
-  kprintf("[APIC] MADT revision: %d\n", madt->header.revision);
-
-  k_debug("[APIC] Reading MADT local APIC address...");
-
   uint64_t lapic_phys = madt->local_apic_addr;
-
-  kprintf("[APIC] Local APIC physical: %x\n", lapic_phys);
-  kprintf("[APIC] Local APIC virtual: %x\n", lapic_phys + kernel.hhdm);
-
   kernel.lapic_base = lapic_phys + kernel.hhdm;
-
-  kprintf("[APIC] kernel.lapic_base = %x\n", kernel.lapic_base);
-
-  k_debug("[APIC] Mapping Local APIC...");
 
   map_page(kernel.lapic_base, lapic_phys,
            KERNEL_PFLAG_PRESENT | KERNEL_PFLAG_WRITE, 1);
 
-  k_debug("[APIC] Local APIC mapping completed");
-
-  k_debug("[APIC] Calling init_local_apic()...");
-
   init_local_apic(kernel.lapic_base);
-
-  k_debug("[APIC] init_local_apic() completed");
-
-  k_debug("[APIC] Initializing IRQ override table...");
 
   uint64_t offset = sizeof(MADT);
   uint64_t madt_end = madt->header.length;
-
-  kprintf("[APIC] MADT start: %x\n", madt);
-  kprintf("[APIC] MADT length: %d\n", madt_end);
-  kprintf("[APIC] Initial entry offset: %d\n", offset);
 
   for (int i = 0; i < 16; i++) {
     kernel.irq_overrides[i] = i;
   }
 
-  k_debug("[APIC] IRQ override table initialized");
-
   int entry_index = 0;
+  int ioapic_count = 0;
 
   while (offset < madt_end) {
-
-    kprintf("[APIC] Processing MADT entry #%d\n", entry_index);
-    kprintf("[APIC] Entry offset: %d / %d\n", offset, madt_end);
-
     MADTEntryHeader *entry = (MADTEntryHeader *)(((uint64_t)madt) + offset);
-
-    kprintf("[APIC] Entry address: %x\n", entry);
-
-    kprintf("[APIC] Entry type: %d\n", entry->entry_type);
-
-    kprintf("[APIC] Entry length: %d\n", entry->record_length);
 
     /*
      * Extremely important sanity checks.
      */
-    if (entry->record_length < sizeof(MADTEntryHeader)) {
-      k_debug("[APIC] ERROR: Invalid MADT entry length!");
-      kprintf("[APIC] record_length = %d\n", entry->record_length);
-      halt();
-    }
-
-    if (offset + entry->record_length > madt_end) {
-      k_debug("[APIC] ERROR: MADT entry extends past MADT!");
-      kprintf("[APIC] offset=%d length=%d end=%d\n", offset,
-              entry->record_length, madt_end);
+    if (entry->record_length < sizeof(MADTEntryHeader) ||
+        offset + entry->record_length > madt_end) {
+      klog(KLOG_ERROR, "APIC");
+      kprintf("malformed MADT entry at offset %d\n", offset);
       halt();
     }
 
     switch (entry->entry_type) {
 
     case APIC_TYPE_IO: {
-      k_debug("[APIC] Found I/O APIC entry");
-
       IOApic *ioapic = (IOApic *)entry;
-
-      kprintf("[APIC] I/O APIC ID: %d\n", ioapic->ioapic_id);
-
-      kprintf("[APIC] I/O APIC physical address: %x\n", ioapic->ioapic_addr);
-
-      kprintf("[APIC] GSI base: %d\n", ioapic->global_system_interrupt_base);
 
       kernel.ioapic_device = *ioapic;
       kernel.ioapic_addr = ioapic->ioapic_addr;
@@ -245,46 +168,23 @@ void init_apic() {
       uint64_t ioapic_phys = ioapic->ioapic_addr;
       uint64_t ioapic_virt = ioapic_phys + kernel.hhdm;
 
-      kprintf("[APIC] I/O APIC virtual address: %x\n", ioapic_virt);
-
-      k_debug("[APIC] Mapping I/O APIC...");
-
       map_page(ioapic_virt, ioapic_phys,
                KERNEL_PFLAG_PRESENT | KERNEL_PFLAG_WRITE, 1);
 
-      k_debug("[APIC] I/O APIC mapping completed");
-
-      break;
-    }
-
-    case APIC_TYPE_LOCAL: {
-      k_debug("[APIC] Found processor Local APIC entry");
-
-      ProcessorLocalAPIC *lapic = (ProcessorLocalAPIC *)entry;
-
-      kprintf("[APIC] Processor ID: %d\n", lapic->processor_id);
-
-      kprintf("[APIC] APIC ID: %d\n", lapic->apic_id);
-
+      ioapic_count++;
       break;
     }
 
     case APIC_TYPE_IO_OVERRIDE: {
-      k_debug("[APIC] Found Interrupt Source Override");
-
       IOApicInterruptSourceOverride *iso =
           (IOApicInterruptSourceOverride *)entry;
-
-      kprintf("[APIC] IRQ source: %d\n", iso->irq_source);
-
-      kprintf("[APIC] GSI: %d\n", iso->global_system_interrupt);
-
-      kprintf("[APIC] Flags: %x\n", iso->flags);
 
       if (iso->irq_source < 16) {
         kernel.irq_overrides[iso->irq_source] = iso->global_system_interrupt;
       } else {
-        k_debug("[APIC] WARNING: IRQ source >= 16");
+        klog(KLOG_WARN, "APIC");
+        kprintf("interrupt source override irq %d >= 16, ignoring\n",
+                iso->irq_source);
       }
 
       kernel.iso = iso;
@@ -293,24 +193,22 @@ void init_apic() {
     }
 
     default:
-      kprintf("[APIC] Unknown MADT entry type: %d\n", entry->entry_type);
       break;
     }
 
     offset += entry->record_length;
-
-    kprintf("[APIC] Next MADT offset: %d\n", offset);
-
     entry_index++;
 
     /*
      * Prevent an accidental infinite loop on real hardware.
      */
     if (entry_index > 256) {
-      k_debug("[APIC] ERROR: Too many MADT entries");
+      klog(KLOG_ERROR, "APIC");
+      kprintf("too many MADT entries, aborting\n");
       halt();
     }
   }
 
-  k_debug("[APIC] === APIC Done ===");
+  klog(KLOG_INFO, "APIC");
+  kprintf("initialized, %d I/O APIC(s) found\n", ioapic_count);
 }

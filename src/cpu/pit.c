@@ -15,9 +15,7 @@ unsigned read_pit_count(void) {
 }
 
 void set_pit_count(unsigned count) {
-  // Disable interrupts
   outPortB(0x43, 0x30);
-  // Set low byte
   outPortB(0x40, count & 0xFF);          // Low byte
   outPortB(0x40, (count & 0xFF00) >> 8); // High byte
   return;
