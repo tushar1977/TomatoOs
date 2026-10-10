@@ -57,6 +57,11 @@ typedef struct {
 
   struct nvme_controller *nvme_controllers[256];
   int nvme_controller_ptr;
+
+  // ext2
+  struct ext2_partition *ext2_partitions[8];
+  int ext2_partition_count;
+  struct ext2_partition *root_fs;
 } Kernel;
 
 extern Kernel kernel;
