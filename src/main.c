@@ -95,7 +95,7 @@ void kmain(void) {
 
   acpi_init();
 
-  // reg(nvme_init, 0x01, 0x08);
+  reg(nvme_init, 0x01, 0x08);
   initworkspace();
 
   klog(KLOG_INFO, "KERNEL");
