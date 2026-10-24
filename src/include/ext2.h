@@ -21,6 +21,7 @@
 #define EXT2_GOOD_OLD_INODE_SIZE 128
 #define EXT2_GOOD_OLD_FIRST_INO 11
 #define EXT2_VALID_FS 1
+#define EXT2_ROOT_INO 2
 #define EXT2_ERROR_FS 2
 
 // Block 1
@@ -141,6 +142,12 @@ struct ext2_partition {
   uint32_t group_count;
   uint32_t inode_size;
   uint32_t first_ino;
+  uint32_t inodes_per_block; /* block_size / inode_size */
+  uint32_t itb_per_group;    /* inode table blocks per group */
+  uint32_t desc_per_block;   /* block_size / sizeof(struct ext2_group_desc) */
+  uint32_t gdb_count;        /* blocks the group descriptor table occupies */
+
+  struct ext2_group_desc *groups; // group_count entries, loaded at mount
 
   bool read_only;
   bool sb_dirty;
@@ -171,9 +178,24 @@ struct ext4_extent_idx {
   uint16_t ei_unused;
 };
 
-void ext2_init(struct disk *target_disk, uint64_t lba_start);
+bool ext2_init(struct ext2_partition *fs, struct disk *target_disk,
+               uint64_t lba_start);
 
+// Superblock and group desc
 bool ext2_read_superblock(struct ext2_partition *fs);
+bool ext2_write_superblock(struct ext2_partition *fs);
+void ext2_compute_layout(struct ext2_partition *fs);
+bool ext2_fill_super(struct ext2_partition *fs);
+struct ext2_group_desc *ext2_get_group_desc(struct ext2_partition *fs,
+                                            uint32_t group);
+bool ext2_read_group_descs(struct ext2_partition *fs);
 
+// Io ops
 bool ext2_read_blocks(struct ext2_partition *fs, uint32_t block, char *buf);
 bool ext2_write_blocks(struct ext2_partition *fs, uint32_t block, char *buf);
+
+// Inode
+bool ext2_read_inode(struct ext2_partition *fs, uint32_t ino,
+                     struct ext2_inode *out);
+bool ext2_bmap(struct ext2_partition *fs, const struct ext2_inode *in,
+               uint64_t fb, uint32_t *disk_block);

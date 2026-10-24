@@ -1,59 +1,57 @@
-#include "../include/keyboard.h"
-#include "../include/fb.h"
-#include "../include/idt.h"
-#include "../include/kernel.h"
-#include "../include/memory.h"
-#include "../include/printf.h"
-#include "../include/stdio.h"
-#include "../include/string.h"
+#include "keyboard.h"
 #include "apic.h"
+#include "apic_timer.h"
+#include "fb.h"
+#include "idt.h"
+#include "kernel.h"
 #include "kmem.h"
+#include "memory.h"
 #include "power.h"
+#include "printf.h"
 #include "stdint.h"
+#include "stdio.h"
+#include "string.h"
 #include "util.h"
 #include "vfs.h"
 #include <stdbool.h>
 
-bool capsOn;
-bool capsLock;
+enum {
+  UNKNOWN = 0x100,
+  ESC,
+  CTRL,
+  LSHFT,
+  RSHFT,
+  ALT,
+  F1,
+  F2,
+  F3,
+  F4,
+  F5,
+  F6,
+  F7,
+  F8,
+  F9,
+  F10,
+  F11,
+  F12,
+  SCRLCK,
+  HOME,
+  UP,
+  LEFT,
+  RIGHT,
+  DOWN,
+  PGUP,
+  PGDOWN,
+  END,
+  INS,
+  DEL,
+  CAPS,
+  NONE,
+  ALTGR,
+  NUMLCK
+};
 
-char text[100] = {0};
-
-const uint32_t UNKNOWN = 0xFFFFFFFF;
-const uint32_t ESC = 0xFFFFFFFF - 1;
-const uint32_t CTRL = 0xFFFFFFFF - 2;
-const uint32_t LSHFT = 0xFFFFFFFF - 3;
-const uint32_t RSHFT = 0xFFFFFFFF - 4;
-const uint32_t ALT = 0xFFFFFFFF - 5;
-const uint32_t F1 = 0xFFFFFFFF - 6;
-const uint32_t F2 = 0xFFFFFFFF - 7;
-const uint32_t F3 = 0xFFFFFFFF - 8;
-const uint32_t F4 = 0xFFFFFFFF - 9;
-const uint32_t F5 = 0xFFFFFFFF - 10;
-const uint32_t F6 = 0xFFFFFFFF - 11;
-const uint32_t F7 = 0xFFFFFFFF - 12;
-const uint32_t F8 = 0xFFFFFFFF - 13;
-const uint32_t F9 = 0xFFFFFFFF - 14;
-const uint32_t F10 = 0xFFFFFFFF - 15;
-const uint32_t F11 = 0xFFFFFFFF - 16;
-const uint32_t F12 = 0xFFFFFFFF - 17;
-const uint32_t SCRLCK = 0xFFFFFFFF - 18;
-const uint32_t HOME = 0xFFFFFFFF - 19;
-const uint32_t UP = 0xFFFFFFFF - 20;
-const uint32_t LEFT = 0xFFFFFFFF - 21;
-const uint32_t RIGHT = 0xFFFFFFFF - 22;
-const uint32_t DOWN = 0xFFFFFFFF - 23;
-const uint32_t PGUP = 0xFFFFFFFF - 24;
-const uint32_t PGDOWN = 0xFFFFFFFF - 25;
-const uint32_t END = 0xFFFFFFFF - 26;
-const uint32_t INS = 0xFFFFFFFF - 27;
-const uint32_t DEL = 0xFFFFFFFF - 28;
-const uint32_t CAPS = 0xFFFFFFFF - 29;
-const uint32_t NONE = 0xFFFFFFFF - 30;
-const uint32_t ALTGR = 0xFFFFFFFF - 31;
-const uint32_t NUMLCK = 0xFFFFFFFF - 32;
-
-const uint32_t lowercase[128] = {
+static const uint32_t lowercase[128] = {
 
     UNKNOWN, ESC,     '1',     '2',     '3',     '4',     '5',     '6',
     '7',     '8',     '9',     '0',     '-',     '=',     '\b',    '\t',
@@ -72,7 +70,7 @@ const uint32_t lowercase[128] = {
     UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN,
     UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN};
 
-const uint32_t uppercase[128] = {
+static const uint32_t uppercase[128] = {
     UNKNOWN, ESC,     '!',     '@',     '#',     '$',     '%',     '^',
     '&',     '*',     '(',     ')',     '_',     '+',     '\b',    '\t',
     'Q',     'W',     'E',     'R',     'T',     'Y',     'U',     'I',
@@ -89,6 +87,15 @@ const uint32_t uppercase[128] = {
     UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN,
     UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN,
     UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN};
+
+#define KBD_BUF 128
+static volatile uint8_t kbd_buf[KBD_BUF];
+static volatile uint32_t kbd_head, kbd_tail;
+
+static bool shift_down, caps_lock;
+static char line[100];
+static size_t line_len;
+
 char *slice(const char *str, size_t start, size_t end) {
   size_t len = end - start;
   char *result = (char *)kmalloc(len + 1);
@@ -99,104 +106,161 @@ char *slice(const char *str, size_t start, size_t end) {
   result[len] = '\0';
   return result;
 }
-__attribute__((interrupt)) void keyboardhandler(struct IDTEFrame *frame) {
-  char scanCode = inPortB(0x60) & 0x7F;
-  char press = inPortB(0x60) & 0x80;
-  // kprintf("%x", scanCode);
 
-  switch (scanCode) {
-  case 1:
-  case 29:
-  case 56:
-  case 59:
-  case 60:
-  case 61:
-  case 62:
-  case 63:
-  case 64:
-  case 65:
-  case 66:
-  case 67:
-  case 68:
-  case 87:
-  case 88:
-    break;
-  case 42:
-    if (press == 0) {
-      capsOn = true;
-    } else {
-      capsOn = false;
-    }
-    break;
-  case 28:
-    if (press == 0) {
-      kprintf("\n");
+static void cmd_clear(int c, char **v) {
+  (void)c;
+  (void)v;
+  clear();
+}
+static void cmd_reboot(int c, char **v) {
+  (void)c;
+  (void)v;
+  reboot();
+}
+static void cmd_shutdown(int c, char **v) {
+  (void)c;
+  (void)v;
+  shutdown();
+}
+static void cmd_ls(int c, char **v) {
+  (void)c;
+  (void)v;
+  display_all_files();
+}
 
-      // Local commands
-      if (strcmp("clear", text) == 0) {
-        clear();
-      }
-      if (strcmp("reboot", text) == 0) {
-        reboot();
-      }
-      if (strcmp("shutdown", text) == 0) {
-        shutdown();
-      }
-      if (strcmp("ls", text) == 0) {
-        display_all_files();
-      } else if (scanCode != 28) {
-        kprintf("Unknown command: %s\n", text);
-      }
-      memset(text, 0, sizeof(text));
+static void cmd_help(int c, char **v);
 
-      kprintf("tusos-->");
-    }
-    break;
+static const struct command commands[] = {
+    {"clear", "clear the screen", cmd_clear},
+    {"reboot", "restart the machine", cmd_reboot},
+    {"shutdown", "power off", cmd_shutdown},
+    {"ls", "list files", cmd_ls},
+    {"help", "list commands", cmd_help},
+};
 
-  case 58:
-    if (!capsLock && press == 0) {
-      capsLock = true;
-    } else if (capsLock && press == 0) {
-      capsLock = false;
-    }
-    break;
-  default:
-    if (press == 0) {
-      if (scanCode >= 0 && scanCode < 128) {
-        char ch;
-        if (capsOn) {
-          ch = uppercase[scanCode];
-        } else if (capsLock) {
-          ch = (scanCode >= 'a' && scanCode <= 'z') ? uppercase[scanCode]
-                                                    : lowercase[scanCode];
-        } else {
-          ch = lowercase[scanCode];
-        }
-        if (ch == '\b') {
-          int i = 0;
-          while (text[i] != '\0')
-            i++;
-          if (i > 0)
-            text[i - 1] = '\0';
-          kprintf("\b \b");
-        } else {
-          kprintf("%c", ch);
-          int i = 0;
-          while (text[i] != '\0' && i < sizeof(text) - 1) {
-            i++;
-          }
-          if (i < sizeof(text) - 1) {
-            text[i] = ch;
-            text[i + 1] = '\0';
-          }
-        }
-      }
+// entries in commmand table
+#define NCMDS (sizeof(commands) / sizeof(commands[0]))
+
+static void cmd_help(int c, char **v) {
+  (void)c;
+  (void)v;
+  for (size_t i = 0; i < NCMDS; i++)
+    kprintf("  %s - %s\n", commands[i].name, commands[i].help);
+}
+
+static void run_line(char *s) {
+  char *argv[16];
+  int argc = 0;
+  while (*s && argc < 16) {
+    while (*s == ' ')
+      *s++ = '\0';
+    if (!*s)
+      break;
+    argv[argc++] = s;
+    while (*s && *s != ' ')
+      s++;
+  }
+  if (argc == 0)
+    return;
+
+  for (size_t i = 0; i < NCMDS; i++) {
+    if (strcmp(argv[0], commands[i].name) == 0) {
+      commands[i].fn(argc, argv);
+      return;
     }
   }
+  kprintf("Unknown command: %s\n", argv[0]);
+}
 
+// line editor
+static void line_input(char ch) {
+  if (ch == '\n') {
+    kprintf("\n");
+    line[line_len] = '\0';
+    run_line(line);
+    line_len = 0;
+    kprintf("tusos-->");
+  } else if (ch == '\b') {
+    if (line_len) {
+      line_len--;
+      kprintf("\b \b");
+    }
+  } else if (line_len < sizeof(line) - 1) {
+    line[line_len++] = ch;
+    kprintf("%c", ch);
+  }
+}
+
+// scancode decorder
+static void handle_scancode(uint8_t raw) {
+  static bool extended;
+  if (raw == 0xE0) { // prefix for arrows, right ctrl, etc
+    extended = true;
+    return;
+  }
+  bool ext = extended;
+  extended = false;
+  if (ext)
+    return;
+
+  bool released = raw & 0x80;
+  uint8_t code = raw & 0x7F;
+  uint16_t key = lowercase[code];
+
+  switch (key) {
+  case LSHFT:
+  case RSHFT:
+    shift_down = !released;
+    return;
+  case CAPS:
+    if (!released)
+      caps_lock = !caps_lock;
+    return;
+  default:
+    break;
+  }
+
+  if (released || key > 0x7F)
+    return;
+
+  bool letter = key >= 'a' && key <= 'z';
+  bool upper = shift_down ^ (caps_lock && letter);
+  line_input((char)(upper ? uppercase[code] : key));
+}
+
+__attribute__((interrupt)) void keyboardhandler(struct IDTEFrame *frame) {
+  (void)frame;
+  uint8_t sc = inPortB(0x60);
+  uint32_t next = (kbd_head + 1) % KBD_BUF;
+  if (next != kbd_tail) {
+    kbd_buf[kbd_head] = sc;
+    kbd_head = next;
+  }
   end_of_interrupt();
 }
-void initKeyboard() {
+
+void keyboard_poll(void) {
+  while (kbd_tail != kbd_head) {
+    uint8_t sc = kbd_buf[kbd_tail];
+    kbd_tail = (kbd_tail + 1) % KBD_BUF;
+    handle_scancode(sc);
+  }
+}
+
+void keyboard_idle(void) {
+  keyboard_poll();
+  if (kbd_tail == kbd_head)
+    sleep(1);
+}
+
+void shell_run(void) {
+  kprintf("[shell_run entered]\n");
+  kprintf("tusos-->");
+  for (;;)
+    keyboard_idle();
+}
+
+void initKeyboard(void) {
   uint32_t gsi = kernel.irq_overrides[1];
   set_ioapic_entry(0x21, 1, 0, 0);
   unmask_ioapic(gsi, 0);

@@ -30,8 +30,13 @@ xorriso -as mkisofs -b boot/limine/limine-bios-cd.bin \
 
 ./limine/limine bios-install myos.iso
 
-if [ ! -f disk.img ]; then
-  qemu-img create -f raw disk.img 6G
+if [ ! -f disk-ext2.img ]; then
+  qemu-img create -f raw disk-ext2.img 6G
+  mkfs.ext2 -F disk-ext2.img
+  mkdir -p /tmp/ext2-mount
+  sudo mount -o loop disk-ext2.img /tmp/ext2-mount
+  sudo mkdir -p /tmp/ext2-mount/testfs
+  sudo umount /tmp/ext2-mount
 fi
 
 if [ "$1" == "debug" ]; then
@@ -42,7 +47,7 @@ if [ "$1" == "debug" ]; then
     -m 1G \
     -smp 4,sockets=1,cores=4,threads=1 \
     -mem-prealloc \
-    -drive file=disk.img,format=raw,if=none,id=nvme0 \
+    -drive file=disk-ext2.img,format=raw,if=none,id=nvme0 \
     -device nvme,drive=nvme0,serial=MYOSNVME
 else
   qemu-system-x86_64 myos.iso \
@@ -51,6 +56,6 @@ else
     -m 1G \
     -smp 4,sockets=1,cores=4,threads=1 \
     -mem-prealloc \
-    -drive file=disk.img,format=raw,if=none,id=nvme0 \
+    -drive file=disk-ext2.img,format=raw,if=none,id=nvme0 \
     -device nvme,drive=nvme0,serial=MYOSNVME
 fi

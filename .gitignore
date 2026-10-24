@@ -1,4 +1,5 @@
 bin/
+testfs/
 *.img
 .cache/
 src/include/uacpi/

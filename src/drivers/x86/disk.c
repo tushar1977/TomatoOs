@@ -4,6 +4,7 @@
 #include "include/pmm.h"
 #include "kernel.h"
 #include "klog.h"
+#include "kmem.h"
 #include "mbr.h"
 #include "printf.h"
 #include <stdarg.h>
@@ -106,19 +107,17 @@ bool disk_try_linux(struct disk *disk) {
       (struct ext2_superblock *)((uint64_t)buffer + b.offset);
 
   bool is_ext2 = (sb->s_magic == EXT2_MAGIC);
-  if (is_ext2) {
-    klog(KLOG_INFO, "DISK");
-    kprintf("detected ext2 on raw disk\n");
-  } else {
-    klog(KLOG_WARN, "DISK");
-    kprintf("no known filesystem on raw disk (magic=%x)\n",
-            (unsigned int)sb->s_magic);
-  }
-
   pmm_free((uint64_t)phys, 1);
 
   if (is_ext2) {
-    ext2_init(disk, 0);
+    struct ext2_partition *fs = kmalloc(sizeof(*fs));
+    if (!fs) {
+      klog(KLOG_ERROR, "DISK");
+      kprintf("out of memory for ext2 partition\n");
+      return false;
+    }
+    if (!ext2_init(fs, disk, 0))
+      kfree(fs);
   }
 
   return is_ext2;
@@ -130,7 +129,7 @@ bool disk_do_mbr_linux(struct disk *disk, uint64_t start) {
   void *phys = (void *)pmm_alloc_page(4096);
   char *buffer = (char *)(kernel.hhdm + (uint64_t)phys);
 
-  bool ok = disk->read(disk->arg, buffer, b.lba, b.size_in_blocks);
+  bool ok = disk->read(disk->arg, buffer, start + b.lba, b.size_in_blocks);
 
   if (!ok) {
     klog(KLOG_ERROR, "DISK");
@@ -155,7 +154,9 @@ bool disk_do_mbr_linux(struct disk *disk, uint64_t start) {
   pmm_free((uint64_t)phys, 1);
 
   if (is_ext2) {
-    ext2_init(disk, start);
+    struct ext2_partition *fs = kmalloc(sizeof(*fs));
+    if (!ext2_init(fs, disk, start))
+      kfree(fs);
   }
 
   return is_ext2;
@@ -193,7 +194,6 @@ void disk_mbr(struct disk *new_disk) {
   void *phys = (void *)pmm_alloc_page(4096);
   char *buffer = (char *)(kernel.hhdm + (uint64_t)phys);
 
-  struct gpt_lba1 lba1 = {};
   new_disk->read(new_disk->arg, (char *)buffer, 0, 1);
 
   struct mbr_sector *mbr = (struct mbr_sector *)buffer;

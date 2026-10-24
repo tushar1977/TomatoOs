@@ -94,12 +94,13 @@ void kmain(void) {
   init_vfs();
 
   acpi_init();
-  // reg(nvme_dump_info, 0x01, 0x08);
-  reg(nvme_init, 0x01, 0x08);
+
+  // reg(nvme_init, 0x01, 0x08);
   initworkspace();
 
   klog(KLOG_INFO, "KERNEL");
   kprintf("boot complete\n");
 
+  shell_run();
   halt();
 }
